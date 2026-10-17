@@ -1,0 +1,62 @@
+diff --git a/CasioEmuMsvc/CMakeLists.txt b/CasioEmuMsvc/CMakeLists.txt
+index cfa60e2..3be008f 100644
+--- a/CasioEmuMsvc/CMakeLists.txt
++++ b/CasioEmuMsvc/CMakeLists.txt
+@@ -239,6 +239,9 @@ file(GLOB MAIN_SOURCES_CHIPSET CONFIGURE_DEPENDS "${SOURCE_DIR}/Chipset/*.cpp")
+ file(GLOB MAIN_SOURCES_EPS6800_CORE "${SOURCE_DIR}/Chipset/EPS6800Core/*.c")
+ file(GLOB MAIN_SOURCES_CRASH "${SOURCE_DIR}/CrashHandler/*.cpp")
+ file(GLOB MAIN_SOURCES_EXT "${SOURCE_DIR}/Ext/*.cpp" "${SOURCE_DIR}/Ext/*.mm")
++if(NOT APPLE)
++    list(FILTER MAIN_SOURCES_EXT EXCLUDE REGEX "\\.mm$")
++endif()
+ file(GLOB MAIN_SOURCES_EXT_CAM "${SOURCE_DIR}/Ext/cam/*.cc")
+ file(GLOB MAIN_SOURCES_ROP "${SOURCE_DIR}/Rop/*.cpp")
+ file(GLOB MAIN_SOURCES_GUI "${SOURCE_DIR}/Gui/*.cpp")
+diff --git a/CasioEmuMsvc/Resource.rc b/CasioEmuMsvc/Resource.rc
+index e162ed3af8039bb63b76ffadba6a47187f01d134..0bfe5fa9c02198120ec16cf53554031a46d137ea 100644
+GIT binary patch
+literal 1593
+zcmcIk!EV$r5WV{=hU}%Qq77}oAe*?sBAZm3P1Q;(MN#6gma@(&c32_xz>NzxBrbdd
+zoH@|HDRAT$m}IqS7PY`3_+WWv?D6=$H#SX}iL@$JnQOQds!j^9kB{Lcm%K_e&!FO}
+ztgDoRN-MF^6JnZVBxG9D83$t@ovaK(Mj6kA<X~Ndi^yR?Jg1fu_}+CKUeBh17vk9g
+zM^lMug4>mvSLGV?io=3lEtqe6kwf9Md%<s|Z-vC_+rkGdszIlg2*e*y7#s$;`||1g
+zhqp&RKEJuUegE_8JG8%jyd8H>S4fV?;mMAm?8rL5LUO_&n%gvXJZ}s)H_#6*thpQ8
+z&%-hCEZ>bRmqN2Z7xQUIpF$W-`;ItdvkQ-%GwQTg9RR@m%iskDhJ|^@evj%#59H*4
+zd@`jj^9kVSNp<<mAk@b~PaoZUuW+N&iLtDf(%2>IQk*@S;-TFmE;Hl-2MV`qlRZA<
+zzaYfYQnt|GmCYKqLa(4Gw_Isp4!lZ=n!~0@Qtb9zROr<uaH;BwL$cWvB2Bcwb7GeW
+zMYT?ZRDh-uN^_|Jqe)SKdX45<O$c*X%<RBFX`b2}jjv~ROQXp>!KwL0`WXFP*u#p7
+pwCX+V-#tCU-t<qO*IC!W?dLVLKn|dmrG7w?GmH5xYwdK;(=RYjmWu!Y
+
+literal 3272
+zcmd5;+l~@J5IxUE|DlDK-ROdsFOZ8k5!lTR5KTzP1{NjZ76vp%AAIwxbv>t>hFN9?
+z6<;Qund+{t>aMQ)-LEprFlb?dAy!x*;y1>cxE^s4Hn_o*t16yw7<|Aj=KNN~uL(!Q
+ztq8@p;cUpc;Yz1Xup~_hkMMxElr1b0JLm3{)FVq<Nbr~N5d}*v&Z4CoTRxrr3Reix
+zK^HXyxWoY0s1sY`yp1N_6BF{^LWP(n=l*`lkiX%j^U$C{y&URzOf4-i<NMdtj`Yys
+ztKab-@YPkmQ~IbA|AOD4MgDAq&sM*V@4o)?r!g;)^NtO5B~Kdj-KY76*StSBU(icu
+zaMAv8dxq~{!^?+v7ww<D^At-*vACI7ojkr5KO>w`ORwoUE^b1`NS6^*rSA;rK}`;w
+z`;Eh7a&~yeHT`rzzBi1pb9-x(*fz0U!iM!lk8yPJ)H<o_c*?Uw(p7ky<2j^I3<r$i
+zD^diMHy~H-;BDDf*G)aX?Cp*#Up9?P<L&EVR%H8qL4D7u!>k;j{R-dSu-QQ?vmNQ#
+zwvT7qj9aJX_Ig$>IpvPDEMGt}#}v?KuIe*_UB2H-nI+N76D9iBdx|y(kC+veSKN@*
+z(sE4F+q{k9cFxya5=tTu4LxPZ3Nznf;&0gR8f!(>Aj2BI;7YY${X#&$G5BQrg^jIH
+zOH$m}jzC?4D)?$kyC$cx8dis)s$)pG<d~9bXnTu^mB!e0TrOALW~5Ok5s}l$9dRv5
+zR68Y)cy#KNLmkPN?e2`w)k8@fFoy-qV(J|fQOAa-J4O@VE9_)1ZD;YWMslY4*WYLP
+ze0fw{8t*$EDj$sPd$a0vGKS*k<!kO^#>4;Z*p$<bcWhpd`O-sN8cCR)Gv|y(#bmNS
+TOWIv0wMeO*eZ=i&X;JkXARmb=
+
+diff --git a/McpPlugin/CMakeLists.txt b/McpPlugin/CMakeLists.txt
+index 879c78b..4cd3e1b 100644
+--- a/McpPlugin/CMakeLists.txt
++++ b/McpPlugin/CMakeLists.txt
+@@ -20,7 +20,11 @@ target_compile_definitions(CasioEmuMsvcMcpPlugin PRIVATE
+     _CRT_SECURE_NO_WARNINGS
+ )
+ 
+-target_compile_options(CasioEmuMsvcMcpPlugin PRIVATE /utf-8 /bigobj)
++if(MSVC)
++    target_compile_options(CasioEmuMsvcMcpPlugin PRIVATE /utf-8 /bigobj)
++elseif(MINGW)
++    target_compile_options(CasioEmuMsvcMcpPlugin PRIVATE -Wa,-mbig-obj)
++endif()
+ 
+ target_include_directories(CasioEmuMsvcMcpPlugin PRIVATE
+     ${CMAKE_CURRENT_SOURCE_DIR}

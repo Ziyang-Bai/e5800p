@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "5800p-kits"
+version = "0.1.0"
+description = "Python firmware descriptions and nXu8 code generation for fx-5800P"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {file = "LICENSE"}
+dynamic = ["dependencies"]
+
+[project.scripts]
+5800p-kits = "kits.__main__:main"
+
+[tool.setuptools]
+package-dir = {"" = "tools", "firmware" = "firmware"}
+packages = ["kits", "firmware", "firmware.e5800p"]
+py-modules = ["nxu8_asm", "instruction_table", "flash_layout", "basic_native", "build_e5800p", "casio_tool", "casio_emulator"]
+include-package-data = false
+
+[tool.setuptools.package-data]
+"firmware.e5800p" = ["*.pbm"]
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}

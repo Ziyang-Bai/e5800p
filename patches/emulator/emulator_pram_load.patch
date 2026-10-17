@@ -1,0 +1,27 @@
+diff --git a/CasioEmuMsvc/src/Peripheral/BatteryBackedRAM.cpp b/CasioEmuMsvc/src/Peripheral/BatteryBackedRAM.cpp
+--- a/CasioEmuMsvc/src/Peripheral/BatteryBackedRAM.cpp
++++ b/CasioEmuMsvc/src/Peripheral/BatteryBackedRAM.cpp
+@@ -92,11 +92,6 @@
+ 				CLASSWIZ_II_SIM_RAM_SIZE);
+ 		}
+ 
+-#ifndef CASIOEMU_DISABLE_RAM_IMAGE
+-		if (emulator.hardware_id != HW_SOLARII)
+-			LoadRAMImage();
+-#endif
+-
+ 		if (emulator.hardware_id == HW_SOLARII) {
+ 			region.Setup(
+ 				0xE000, 0x0800, "BatteryBackedRAM", ram_buffer,
+@@ -127,6 +122,11 @@
+ 				[](MMURegion* r, size_t o, uint8_t d) { static_cast<uint8_t*>(r->userdata)[o - r->base] = d; },
+ 				emulator);
+ 		}
++
++#ifndef CASIOEMU_DISABLE_RAM_IMAGE
++		if (emulator.hardware_id != HW_SOLARII)
++			LoadRAMImage();
++#endif
+ 
+ 		if (!real_hardware && emulator.hardware_id != HW_SOLARII) {
+ 			region_2.Setup(

@@ -1,0 +1,37 @@
+; ui_text
+; CPU 0x81E06, physical 0x01E06, 58 bytes
+
+ui_text:
+PUSH XR4
+PUSH XR8
+MOV ER4,ER0
+MOV ER8,ER6
+MOV ER6,#0x00
+next:
+MOV ER8,ER8
+BEQ fail
+ADD ER8,#0x7F
+L R0,0x0F:[ER2]
+CMP R0,#0x00
+BEQ nul
+MOV ER8,ER8
+BEQ truncate
+ST R0,[ER4]
+ADD ER4,#0x01
+ADD ER2,#0x01
+ADD ER6,#0x01
+BAL next
+truncate:
+MOV R0,#0x00
+ST R0,[ER4]
+fail:
+MOV R0,#0xFF
+MOV R1,#0xFF
+BAL done
+nul:
+ST R0,[ER4]
+MOV ER0,ER6
+done:
+POP XR8
+POP XR4
+RET

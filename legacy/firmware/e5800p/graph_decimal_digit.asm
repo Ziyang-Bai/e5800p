@@ -1,0 +1,26 @@
+; graph_decimal_digit
+; CPU 0x82300, physical 0x02300, 42 bytes
+
+graph_decimal_digit:
+PUSH LR
+PUSH XR8
+MOV R6,R0
+MOV ER10,ER14
+ADD ER10,#0x50
+MOV R9,#0x08
+MOV R2,#0x0A
+branch_000e:
+L R0,[ER10]
+MOV R1,#0x00
+MUL ER0,R2
+ADD R0,R6
+ADDC R1,#0x00
+ST R0,[ER10]
+MOV R6,R1
+ADD ER10,#0x01
+ADD R9,#0xFF
+CMP R9,#0x00
+BNE branch_000e
+POP XR8
+POP LR
+RET

@@ -1,0 +1,29 @@
+diff --git a/CasioEmuMsvc/src/Peripheral/5800Flash.cpp b/CasioEmuMsvc/src/Peripheral/5800Flash.cpp
+--- a/CasioEmuMsvc/src/Peripheral/5800Flash.cpp
++++ b/CasioEmuMsvc/src/Peripheral/5800Flash.cpp
+@@ -78,9 +78,21 @@ namespace casioemu {
+ 						break;
+ 					case 6:
+-						if (fo == 0)
+-							memset(&flash->emulator.chipset.flash_data[fo], 0xff, 0x7fff);
+-						if (fo == 0x20000 || fo == 0x30000)
+-							memset(&flash->emulator.chipset.flash_data[fo], 0xff, 0xffff);
++						if (data == 0x30) {
++							size_t start = 0, size = 0x4000;
++							if (fo >= 0x10000) {
++								start = fo & ~0xffff;
++								size = 0x10000;
++							}
++							else if (fo >= 0x8000) {
++								start = 0x8000;
++								size = 0x8000;
++							}
++							else if (fo >= 0x4000) {
++								start = fo & ~0x1fff;
++								size = 0x2000;
++							}
++							memset(&flash->emulator.chipset.flash_data[start], 0xff, size);
++						}
+ 						return;
+ 					case 7:
+ 						if (fo == 0xaaa && data == 0xaa) {

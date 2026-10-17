@@ -1,0 +1,425 @@
+diff --git a/CasioEmuMsvc/src/casioemu.cpp b/CasioEmuMsvc/src/casioemu.cpp
+--- a/CasioEmuMsvc/src/casioemu.cpp
++++ b/CasioEmuMsvc/src/casioemu.cpp
+@@ -299,6 +299,7 @@
+ 	// static std::atomic<bool> running(true);
+ 	
+ 	DiscordRPC::UpdatePresence(emulator.ModelDefinition.model_name);
++	bool guiCreated = false;
+ 
+ #ifdef __ANDROID__
+ 	TouchMouseTranslator touchTranslator(
+@@ -327,28 +328,6 @@
+ #endif
+ 		});
+ #endif
+-	bool guiCreated = false;
+-	auto frame_event = SDL_RegisterEvents(1);
+-	bool busy = false;
+-	bool running = true;
+-	std::thread t3([&]() {
+-		SDL_Event se{};
+-		se.type = frame_event;
+-		se.user.windowID = SDL_GetWindowID(emulator.window);
+-		while (running) {
+-			if (!busy)
+-				SDL_PushEvent(&se);
+-#ifdef __ANDROID__
+-			SDL_Delay(40);
+-#else
+-			if (ThemeManager::Instance().Settings().lowPerformanceMode || low_perf_ext)
+-				SDL_Delay(24);
+-			else
+-				SDL_Delay(1);
+-#endif
+-		}
+-	});
+-	t3.detach();
+ #ifdef DBG
+ 	if (!no_dbg) {
+ 		test_gui(&guiCreated, emulator.window, emulator.renderer);
+@@ -369,64 +348,80 @@
+ #if defined(_WIN32) || defined(__ANDROID__)
+ 	LoadPlugins();
+ #endif
++	Uint32 last_frame = SDL_GetTicks() - 100;
+ 	while (emulator.Running()) {
+-		SDL_Event event{};
+-		busy = false;
+-		DiscordRPC::Update();
+-		if (!SDL_PollEvent(&event))
+-			continue;
+-		busy = true;
+-		if (event.type == frame_event) {
+-			SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+-			SDL_RenderClear(renderer);
+-			if (bg_txt) {
+-				int w, h;
+-				SDL_GetWindowSize(window, &w, &h);
+-				int bg_w, bg_h;
+-				SDL_QueryTexture(bg_txt, NULL, NULL, &bg_w, &bg_h);
+-
+-				float window_aspect = (float)w / h;
+-				float bg_aspect = (float)bg_w / bg_h;
+-
+-				SDL_Rect dst_rect;
+-				if (window_aspect > bg_aspect) {
+-					dst_rect.w = w;
+-					dst_rect.h = (int)(w / bg_aspect);
+-					dst_rect.x = 0;
+-					dst_rect.y = (h - dst_rect.h) / 2;
++		const Uint32 main_flags = SDL_GetWindowFlags(emulator.window);
++		const bool main_visible = (main_flags & SDL_WINDOW_SHOWN) && !(main_flags & SDL_WINDOW_MINIMIZED);
++		const Uint32 gui_flags = guiCreated ? SDL_GetWindowFlags(window) : 0;
++		const bool gui_visible = (gui_flags & SDL_WINDOW_SHOWN) && !(gui_flags & SDL_WINDOW_MINIMIZED);
++		SDL_Window* focused_window = SDL_GetKeyboardFocus();
++		const bool focused = focused_window &&
++			(focused_window == emulator.window || (guiCreated && focused_window == window) ||
++				SDL_GetWindowData(focused_window, SCREEN_MIRROR_WINDOW_DATA_KEY));
++#ifdef __ANDROID__
++		Uint32 frame_interval = 40;
++#else
++		Uint32 frame_interval = (ThemeManager::Instance().Settings().lowPerformanceMode || low_perf_ext) ? 24 : 17;
++#endif
++		if (!focused && !emulator.recording_active.load())
++			frame_interval = 100;
++		const Uint32 next_frame = last_frame + frame_interval;
++		const Uint32 now = SDL_GetTicks();
++		if (SDL_TICKS_PASSED(now, next_frame)) {
++			DiscordRPC::Update();
++			if (gui_visible) {
++				SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
++				SDL_RenderClear(renderer);
++				if (bg_txt) {
++					int w, h;
++					SDL_GetWindowSize(window, &w, &h);
++					int bg_w, bg_h;
++					SDL_QueryTexture(bg_txt, NULL, NULL, &bg_w, &bg_h);
++
++					float window_aspect = (float)w / h;
++					float bg_aspect = (float)bg_w / bg_h;
++
++					SDL_Rect dst_rect;
++					if (window_aspect > bg_aspect) {
++						dst_rect.w = w;
++						dst_rect.h = (int)(w / bg_aspect);
++						dst_rect.x = 0;
++						dst_rect.y = (h - dst_rect.h) / 2;
++					}
++					else {
++						dst_rect.h = h;
++						dst_rect.w = (int)(h * bg_aspect);
++						dst_rect.x = (w - dst_rect.w) / 2;
++						dst_rect.y = 0;
++					}
++
++					SDL_RenderCopy(renderer, bg_txt, NULL, &dst_rect);
+ 				}
+-				else {
+-					dst_rect.h = h;
+-					dst_rect.w = (int)(h * bg_aspect);
+-					dst_rect.x = (w - dst_rect.w) / 2;
+-					dst_rect.y = 0;
+-				}
+-
+-				SDL_RenderCopy(renderer, bg_txt, NULL, &dst_rect);
+-			}
+-			SDL_SetRenderDrawColor(renderer, 0, 0, 0, 20);
+-			SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+-			SDL_RenderFillRect(renderer, 0);
++				SDL_SetRenderDrawColor(renderer, 0, 0, 0, 20);
++				SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
++				SDL_RenderFillRect(renderer, 0);
++			}
+ #ifdef SINGLE_WINDOW
+ 			emulator.Frame();
+-			gui_loop();
+-
+-#ifdef __ANDROID__
+-			touchTranslator.RenderDebug(renderer);
+-#endif
+-
+-			SDL_RenderPresent(emulator.renderer);
++			if (gui_visible)
++				gui_loop();
++
++#ifdef __ANDROID__
++			if (main_visible)
++				touchTranslator.RenderDebug(emulator.renderer);
++#endif
+ #else
+-			if (!no_dbg) {
++			if (gui_visible)
+ 				gui_loop();
+-			}
+ 			emulator.Frame();
+-			SDL_RenderPresent(emulator.renderer);
+-#endif
+-			if (!no_dbg) {
++#endif
++			if (main_visible)
++				SDL_RenderPresent(emulator.renderer);
++			if (guiCreated) {
+ 				ThemeManager::Instance().ProcessFontRebuild();
+ 				if (ThemeManager::Instance().IsBgReloadRequested()) {
+ 					SDL_DestroyTexture(bg_txt);
++					bg_txt = nullptr;
+ 					SDL_FreeSurface(background);
+ 					background = IMG_Load("background.jpg");
+ 					if (background) {
+@@ -436,16 +431,15 @@
+ 					ThemeManager::Instance().ClearBgReloadRequest();
+ 				}
+ 			}
+-			while (SDL_PollEvent(&event)) {
+-				if (event.type != frame_event)
+-					goto hld;
+-			}
++			last_frame = SDL_GetTicks();
+ 			continue;
+ 		}
+ 
+-	hld:
++		SDL_Event event{};
++		if (!SDL_WaitEventTimeout(&event, static_cast<int>(next_frame - now)))
++			continue;
+ 		int wid, hei;
+-		SDL_GetWindowSize(window, &wid, &hei);
++		SDL_GetWindowSize(guiCreated ? window : emulator.window, &wid, &hei);
+ 		const Uint32 eventWindowId = GetEventWindowId(event);
+ 		if (IsScreenMirrorWindowEvent(event)) {
+ 			if (event.type == SDL_KEYDOWN || event.type == SDL_KEYUP) {
+@@ -456,6 +450,8 @@
+ 		}
+ 		switch (event.type) {
+ 		case SDL_WINDOWEVENT:
++			if (guiCreated && eventWindowId == SDL_GetWindowID(window))
++				ProcessImGuiEvent(event);
+ 			switch (event.window.event) {
+ 			case SDL_WINDOWEVENT_CLOSE:
+ 				// The mirror event watcher can destroy its window before this queued
+@@ -489,9 +485,10 @@
+ 		case SDL_TEXTINPUT:
+ 		case SDL_MOUSEWHEEL:
+ #ifdef SINGLE_WINDOW
+-			ProcessImGuiEvent(event);
+-			if (ImGui::GetIO().WantCaptureMouse) {
+-				break;
++			if (guiCreated) {
++				ProcessImGuiEvent(event);
++				if (ImGui::GetIO().WantCaptureMouse)
++					break;
+ 			}
+ #else
+ 			if (!no_dbg)
+@@ -506,10 +503,6 @@
+ 			break;
+ 		}
+ 	}
+-	running = false;
+-	if (t3.joinable()) {
+-		t3.join();
+-	}
+ 	if (bg_txt) {
+ 		SDL_DestroyTexture(bg_txt);
+ 	}
+diff --git a/CasioEmuMsvc/src/Emulator.cpp b/CasioEmuMsvc/src/Emulator.cpp
+--- a/CasioEmuMsvc/src/Emulator.cpp
++++ b/CasioEmuMsvc/src/Emulator.cpp
+@@ -528,6 +528,8 @@
+ 			// resources), so destroy them before the renderer they use.
+ 			delete& chipset;
+ 
++			if (frame_texture)
++				SDL_DestroyTexture(frame_texture);
+ 			if (scaled_interface_texture)
+ 				SDL_DestroyTexture(scaled_interface_texture);
+ 			SDL_DestroyTexture(interface_texture);
+@@ -571,6 +573,14 @@
+ 		}
+ #endif
+ 		switch (event.type) {
++		case SDL_RENDER_DEVICE_RESET:
++			if (frame_texture) {
++				SDL_DestroyTexture(frame_texture);
++				frame_texture = nullptr;
++			}
++			break;
++		case SDL_RENDER_TARGETS_RESET:
++			break;
+ 		case SDL_MOUSEBUTTONDOWN:
+ 		case SDL_MOUSEBUTTONUP:
+ 			event.button.x -= emu_rect.x;
+@@ -701,6 +711,8 @@
+ 		}
+ 
+ 		Uint64 cycles_to_emulate = cycles.GetDelta();
++		if (Paused)
++			return;
+ 		for (Uint64 ix = 0; ix != cycles_to_emulate; ++ix)
+ 			if (!Paused)
+ 				Tick();
+@@ -713,6 +725,13 @@
+ 	void Emulator::Frame() {
+ 		if (headless)
+ 			return;
++#if !defined(__EMSCRIPTEN__) && !defined(CASIOEMU_CORE_WEB)
++		const Uint32 flags = SDL_GetWindowFlags(window);
++		if (!(flags & SDL_WINDOW_SHOWN) || (flags & SDL_WINDOW_MINIMIZED)) {
++			chipset.Frame();
++			return;
++		}
++#endif
+ 		// std::lock_guard<decltype(access_mx)> access_lock(access_mx);
+ 		const bool board_interface = !ModelDefinition.board_path.empty() &&
+ 			interface_background.dest.w > 0 && interface_background.dest.h > 0;
+@@ -781,10 +800,20 @@
+ 		const int render_target_w = interface_background.dest.w;
+ 		const int render_target_h = interface_background.dest.h;
+ 
+-		// create texture `tx` with the same format as `interface_texture`
+-		Uint32 format;
++		Uint32 format = SDL_PIXELFORMAT_UNKNOWN;
+ 		SDL_QueryTexture(interface_texture, &format, nullptr, nullptr, nullptr);
+-		SDL_Texture* tx = SDL_CreateTexture(renderer, format, SDL_TEXTUREACCESS_TARGET, render_target_w, render_target_h);
++		if (!frame_texture || frame_texture_w != render_target_w ||
++			frame_texture_h != render_target_h || frame_texture_format != format) {
++			if (frame_texture)
++				SDL_DestroyTexture(frame_texture);
++			frame_texture = SDL_CreateTexture(renderer, format, SDL_TEXTUREACCESS_TARGET, render_target_w, render_target_h);
++			if (!frame_texture)
++				PANIC("SDL_CreateTexture failed: %s\n", SDL_GetError());
++			frame_texture_w = render_target_w;
++			frame_texture_h = render_target_h;
++			frame_texture_format = format;
++		}
++		SDL_Texture* tx = frame_texture;
+ 
+ 		// render on `tx`
+ 		SDL_SetRenderTarget(renderer, tx);
+@@ -817,7 +846,6 @@
+ 		dest.y = (h - dest.h) / 2; // Centre it
+ 		SDL_RenderCopy(renderer, tx, nullptr, &dest);
+ 		emu_rect = dest;
+-		SDL_DestroyTexture(tx);
+ 		Repaint();
+ 	}
+ 
+diff --git a/CasioEmuMsvc/src/Emulator.hpp b/CasioEmuMsvc/src/Emulator.hpp
+--- a/CasioEmuMsvc/src/Emulator.hpp
++++ b/CasioEmuMsvc/src/Emulator.hpp
+@@ -40,6 +40,11 @@
+ 	};
+ 
+ 	class Emulator {
++		SDL_Texture* frame_texture = nullptr;
++		int frame_texture_w = 0;
++		int frame_texture_h = 0;
++		Uint32 frame_texture_format = SDL_PIXELFORMAT_UNKNOWN;
++
+ 	public:
+ 		SDL_Renderer* renderer = nullptr;
+ 		SDL_Surface* interface_surface = nullptr;
+diff --git a/CasioEmuMsvc/src/Peripheral/Screen.cpp b/CasioEmuMsvc/src/Peripheral/Screen.cpp
+--- a/CasioEmuMsvc/src/Peripheral/Screen.cpp
++++ b/CasioEmuMsvc/src/Peripheral/Screen.cpp
+@@ -1957,25 +1957,26 @@
+ 			}
+ 			std::copy(std::begin(screen_ink_alpha), std::end(screen_ink_alpha), frame_screen_ink_alpha.begin());
+ 		}
+-		int screenWidth = 0, screenHeight = 0;
+-
+-		// Get the renderer output size if not already available
+-		SDL_GetRendererOutputSize(renderer, &screenWidth, &screenHeight);
+-
+-		if (!emulator.ModelDefinition.enable_new_screen) {
+-			SDL_SetTextureColorMod(interface_texture, ink_colour.r, ink_colour.g, ink_colour.b);
+-		}
+-
+-		for (int ix = 1; ix != SpriteCount(); ++ix) {
+-			if (ix >= static_cast<int>(sprite_available.size()) || !sprite_available[ix])
+-				continue;
+-			const int alpha_index = ix - 1;
+-			const uint8_t alpha = Uint8(std::clamp((int)frame_screen_ink_alpha[alpha_index], 0, 255));
+-			if (alpha == 0)
+-				continue;
+-			RenderModelSprite(renderer, interface_texture,
+-				ix < static_cast<int>(sprite_svg_textures.size()) ? &sprite_svg_textures[ix] : nullptr,
+-				sprite_info[ix], ink_colour, alpha);
++		bool draw_main = true;
++#if !defined(__EMSCRIPTEN__) && !defined(CASIOEMU_CORE_WEB)
++		const Uint32 flags = SDL_GetWindowFlags(emulator.window);
++		draw_main = (flags & SDL_WINDOW_SHOWN) && !(flags & SDL_WINDOW_MINIMIZED);
++#endif
++		if (draw_main) {
++			if (!emulator.ModelDefinition.enable_new_screen)
++				SDL_SetTextureColorMod(interface_texture, ink_colour.r, ink_colour.g, ink_colour.b);
++
++			for (int ix = 1; ix != SpriteCount(); ++ix) {
++				if (ix >= static_cast<int>(sprite_available.size()) || !sprite_available[ix])
++					continue;
++				const int alpha_index = ix - 1;
++				const uint8_t alpha = Uint8(std::clamp((int)frame_screen_ink_alpha[alpha_index], 0, 255));
++				if (alpha == 0)
++					continue;
++				RenderModelSprite(renderer, interface_texture,
++					ix < static_cast<int>(sprite_svg_textures.size()) ? &sprite_svg_textures[ix] : nullptr,
++					sprite_info[ix], ink_colour, alpha);
++			}
+ 		}
+ 
+ 		static constexpr auto SPR_PIXEL = 0;
+@@ -2007,7 +2008,7 @@
+ 		}
+ 
+ #ifndef CASIOEMU_CORE_WEB
+-		if (!segment_lcd)
++		if (draw_main && !segment_lcd)
+ 			pixel_screen_texture.Render(renderer, lcd_dest, logical_width, logical_height, ink_colour, frame_screen_ink_alpha.data());
+ #endif
+ 
+diff --git a/CasioEmuMsvc/src/Peripheral/TiMultiViewScreen.cpp b/CasioEmuMsvc/src/Peripheral/TiMultiViewScreen.cpp
+--- a/CasioEmuMsvc/src/Peripheral/TiMultiViewScreen.cpp
++++ b/CasioEmuMsvc/src/Peripheral/TiMultiViewScreen.cpp
+@@ -207,14 +207,21 @@
+ 			frame.logical_width = Width;
+ 			frame.logical_height = Height;
+ 			frame.lcd_dest = sprites[0].dest;
+-			for (size_t i = 0; i < StatusCount; ++i) {
+-				const auto opacity = static_cast<uint8_t>(std::clamp(static_cast<int>(alpha[i]), 0, 255));
+-				if (present[i + 1] && opacity)
+-					RenderModelSprite(frame.renderer, frame.interface_texture, &status_textures[i], sprites[i + 1], *frame.ink_colour, opacity);
+-			}
++			bool draw_main = true;
++#if !defined(__EMSCRIPTEN__) && !defined(CASIOEMU_CORE_WEB)
++			const Uint32 flags = SDL_GetWindowFlags(emulator.window);
++			draw_main = (flags & SDL_WINDOW_SHOWN) && !(flags & SDL_WINDOW_MINIMIZED);
++#endif
++			if (draw_main) {
++				for (size_t i = 0; i < StatusCount; ++i) {
++					const auto opacity = static_cast<uint8_t>(std::clamp(static_cast<int>(alpha[i]), 0, 255));
++					if (present[i + 1] && opacity)
++						RenderModelSprite(frame.renderer, frame.interface_texture, &status_textures[i], sprites[i + 1], *frame.ink_colour, opacity);
++				}
+ #ifndef CASIOEMU_CORE_WEB
+-			pixel_texture.Render(frame.renderer, frame.lcd_dest, Width, Height, *frame.ink_colour, alpha.data());
+-#endif
++				pixel_texture.Render(frame.renderer, frame.lcd_dest, Width, Height, *frame.ink_colour, alpha.data());
++#endif
++			}
+ 			output.Render(frame);
+ 		}
+ 	};
+diff --git a/CasioEmuMsvc/src/Peripheral/ScreenOutput.cpp b/CasioEmuMsvc/src/Peripheral/ScreenOutput.cpp
+--- a/CasioEmuMsvc/src/Peripheral/ScreenOutput.cpp
++++ b/CasioEmuMsvc/src/Peripheral/ScreenOutput.cpp
+@@ -1123,6 +1123,9 @@
+ 			SDL_Renderer* mirror_renderer = mirror.renderer();
+ 			if (!mirror_renderer)
+ 				return false;
++			const Uint32 flags = SDL_GetWindowFlags(SDL_RenderGetWindow(mirror_renderer));
++			if (!(flags & SDL_WINDOW_SHOWN) || (flags & SDL_WINDOW_MINIMIZED))
++				return true;
+ 
+ 			SDL_Rect capture_rect{};
+ 			if (!BuildCaptureRect(source, capture_rect)) {

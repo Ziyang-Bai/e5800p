@@ -1,0 +1,54 @@
+; journal_check
+; Return nonoverlapping (physical S0 offset, machine-code bytes) spans.
+; CPU 0x83B00, physical 0x03B00, 106 bytes
+journal_crc EQU 0x83A00
+
+journal_check:
+PUSH LR
+PUSH ER12
+PUSH ER14
+PUSH ER4
+MOV ER12,ER0
+MOV R2,#0xF0
+MOV R3,#0x1F
+CALL journal_crc
+MOV ER14,ER0
+MOV ER4,ER12
+ADD R4,#0xF0
+ADDC R5,#0x1F
+L R0,0x08:[ER4]
+CMP R0,R14
+BNE bad
+ADD ER4,#0x01
+L R0,0x08:[ER4]
+CMP R0,R15
+BNE bad
+ADD ER4,#0x01
+L R0,0x08:[ER4]
+XOR R0,#0xFF
+CMP R0,R14
+BNE bad
+ADD ER4,#0x01
+L R0,0x08:[ER4]
+XOR R0,#0xFF
+CMP R0,R15
+BNE bad
+ADD ER4,#0x01
+L R0,0x08:[ER4]
+CMP R0,#0x4A
+BNE bad
+ADD ER4,#0x01
+L R0,0x08:[ER4]
+CMP R0,#0xB6
+BNE bad
+ADD ER4,#0x01
+MOV ER0,#0x00
+BAL out
+bad:
+MOV R0,#0xFF
+MOV R1,#0xFF
+out:
+POP ER4
+POP ER14
+POP ER12
+POP PC

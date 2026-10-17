@@ -1,0 +1,124 @@
+diff --git a/CasioEmuMsvc/src/Gui/CodeViewer.cpp b/CasioEmuMsvc/src/Gui/CodeViewer.cpp
+index 40251e2..fecc6e1 100644
+--- a/CasioEmuMsvc/src/Gui/CodeViewer.cpp
++++ b/CasioEmuMsvc/src/Gui/CodeViewer.cpp
+@@ -467,22 +467,16 @@ void CodeViewer::PrepareDisasm() {
+ }
+ 
+ bool CodeViewer::TryTrigBP(uint8_t seg, uint16_t offset, bool bp_mode) {
+-	for (auto it = break_points.begin(); it != break_points.end(); it++) {
+-		if (it->second == 1) {
+-			// TODO: We ignore a second trigger
+-			CodeElem e = codes[it->first];
+-			if (e.offset == pc_cache) {
+-				break_points[it->first] = 2;
+-				cur_col = it->first;
+-				need_roll = true;
+-				return true;
+-			}
+-		}
++	auto it = break_points.find(pc_cache);
++	if (it != break_points.end() && it->second == 1) {
++		it->second = 2;
++		LookUp(pc_cache, &cur_col);
++		need_roll = true;
++		return true;
+ 	}
+ 	if (!bp_mode && (debug_flags & DEBUG_STEP || debug_flags & DEBUG_RET_TRACE)) {
+ 		int idx = 0;
+ 		LookUp(pc_cache, &idx);
+-		break_points[idx] = 2;
+ 		cur_col = idx;
+ 		need_roll = true;
+ 		return true;
+@@ -504,7 +498,7 @@ void CodeViewer::DrawContent() {
+ 		first_col = c.DisplayStart;
+ 		for (int line_i = c.DisplayStart; line_i < c.DisplayEnd; line_i++) {
+ 			CodeElem e = codes[line_i];
+-			auto it = break_points.find(line_i);
++			auto it = break_points.find(e.offset);
+ 			auto bb = it == break_points.end();
+ 			if (!e.is_label) {
+ 				if (e.offset == pc_cache) {
+@@ -548,7 +542,7 @@ void CodeViewer::DrawContent() {
+ 							}
+ 						}
+ 						else {
+-							break_points.erase(line_i);
++							break_points.erase(e.offset);
+ 							ImGui::Text("   ");
+ 						}
+ 					}
+@@ -965,12 +959,8 @@ void CodeViewer::RenderCore() {
+ 	if (auto* core = m_emu->chipset.t4x) {
+ 		// Keep the GUI mirror on this thread, including changes made while loading.
+ 		break_points.clear();
+-		for (const auto address : core->ExecutionBreakpoints()) {
+-			auto it = std::lower_bound(codes.begin(), codes.end(), address,
+-				[](const CodeElem& line, uint32_t value) { return line.offset < value; });
+-			if (it != codes.end() && it->offset == address)
+-				break_points[static_cast<int>(it - codes.begin())] = 1;
+-		}
++		for (const auto address : core->ExecutionBreakpoints())
++			break_points[address] = 1;
+ 		const auto pc = core->ProgramCounter();
+ 		const bool paused = m_emu->GetPaused();
+ 		if (paused && (!core_was_paused || pc_cache != pc)) JumpTo(pc);
+@@ -1249,13 +1239,11 @@ void CodeViewer::AddBreakpoint(uint32_t address) {
+ 		});
+ 		if (it == codes.end())
+ 			return;
+-		break_points[static_cast<int>(it - codes.begin())] = 1;
++		break_points[address] = 1;
+ 		m_emu->chipset.epscpu->AddExecutionBreakpoint(address);
+ 	}
+ 	else {
+-		int idx = 0;
+-		LookUp(address, &idx);
+-		break_points[idx] = 1;
++		break_points[address] = 1;
+ 	}
+ }
+ 
+@@ -1271,13 +1259,11 @@ void CodeViewer::RemoveBreakpoint(uint32_t address) {
+ 			return !line.is_label && line.offset == address;
+ 		});
+ 		if (it != codes.end())
+-			break_points.erase(static_cast<int>(it - codes.begin()));
++			break_points.erase(address);
+ 		m_emu->chipset.epscpu->RemoveExecutionBreakpoint(address);
+ 	}
+ 	else {
+-		int idx = 0;
+-		LookUp(address, &idx);
+-		break_points.erase(idx);
++		break_points.erase(address);
+ 	}
+ }
+ 
+@@ -1294,9 +1280,9 @@ void CodeViewer::ClearBreakpoints() {
+ std::vector<uint32_t> CodeViewer::GetBreakpoints() const {
+ 	if (m_emu->chipset.t4x) return m_emu->chipset.t4x->ExecutionBreakpoints();
+ 	std::vector<uint32_t> result;
+-	for (const auto& [index, state] : break_points) {
+-		if (state == 1 && index >= 0 && static_cast<size_t>(index) < codes.size())
+-			result.push_back(codes[index].offset);
++	for (const auto& [address, state] : break_points) {
++		if (state == 1)
++			result.push_back(address);
+ 	}
+ 	return result;
+ }
+diff --git a/CasioEmuMsvc/src/Gui/CodeViewer.hpp b/CasioEmuMsvc/src/Gui/CodeViewer.hpp
+index 275ceb7..63eac7a 100644
+--- a/CasioEmuMsvc/src/Gui/CodeViewer.hpp
++++ b/CasioEmuMsvc/src/Gui/CodeViewer.hpp
+@@ -22,7 +22,7 @@ enum EmuDebugFlag {
+ };
+ class CodeViewer : public UIWindow {
+ private:
+-	std::map<int, uint8_t> break_points;
++	std::map<uint32_t, uint8_t> break_points;
+ 	std::vector<CodeElem> codes;
+ 	std::thread disasm_thread;
+ 	std::string src_path;

@@ -1,0 +1,7 @@
+PUSH LR
+MOV ER0,#40
+CALL add_two
+POP PC
+add_two:
+ADD ER0,#2
+RET

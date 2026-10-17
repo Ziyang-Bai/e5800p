@@ -1,0 +1,327 @@
+; graph
+; CPU 0x81800, physical 0x01800, 646 bytes
+graph_valid_exponent EQU 0x81C40
+graph_bcd_15_to_fixed_64 EQU 0x82200
+graph_copy_64 EQU 0x82100
+graph_compare_64 EQU 0x82120
+graph_subtract_64 EQU 0x82180
+graph_zero_64 EQU 0x82400
+graph_zero_axis_pixel EQU 0x82420
+graph_y_pixel_64 EQU 0x82380
+graph_plot_sample EQU 0x82500
+rom_refresh EQU 0x043BE
+scanner_address EQU 0x80800
+
+graph:
+PUSH LR
+PUSH ER14
+MOV ER14,SP
+ADD SP,#0x90
+PUSH XR4
+PUSH XR8
+PUSH ER12
+MOV ER0,ER14
+ADD ER0,#0x78
+MOV R2,#0x00
+PUSH R2
+PUSH ER0
+MOV ER0,ER14
+ADD ER0,#0x7C
+MOV R2,#0x00
+PUSH R2
+PUSH ER0
+MOV ER0,ER14
+ADD ER0,#0x74
+MOV R2,#0x00
+PUSH R2
+PUSH ER0
+MOV ER0,ER14
+ADD ER0,#0x73
+MOV R2,#0x00
+PUSH R2
+PUSH ER0
+MOV R2,#0x01
+PUSH R2
+MOV R0,#0x48
+MOV R1,#0xE7
+PUSH ER0
+MOV R0,#0x98
+MOV R1,#0xE7
+MOV R2,#0x01
+CALL 0x1:0xA574
+ADD SP,#0x14
+CMP R0,#0x00
+BEQ branch_0054
+JMP branch_0278
+branch_0054:
+L R0,-2[FP]
+CMP R0,#0x04
+BEQ branch_005e
+JMP branch_0278
+branch_005e:
+L ER0,-6[FP]
+CMP R0,#0x00
+CMPC R1,#0x00
+BEQ branch_006a
+JMP branch_0278
+branch_006a:
+L ER0,-4[FP]
+MOV ER4,ER0
+MOV R2,#0x04
+L R0,R2:[ER4]
+CMP R0,#0x00
+BNE branch_007c
+JMP branch_0278
+branch_007c:
+JMP branch_0084
+MOV R0,#0x00
+MOV R0,#0x00
+branch_0084:
+ST R0,-14[FP]
+MOV R12,R0
+ADD ER4,#0x01
+MOV R2,#0x04
+L R0,R2:[ER4]
+ADD ER4,#0x7F
+CMP R0,#0x02
+BEQ branch_009a
+JMP branch_0278
+branch_009a:
+MOV R0,R12
+MOV R1,#0x00
+MOV R2,#0x14
+MUL ER0,R2
+ADD ER0,#0x02
+MOV ER2,ER0
+L ER0,-8[FP]
+CMP ER0,ER2
+BGES branch_00b0
+JMP branch_0278
+branch_00b0:
+MOV R8,#0x80
+L ER0,-4[FP]
+MOV ER4,ER0
+ADD ER4,#0x0C
+L R12,-14[FP]
+branch_00ba:
+CALL graph_valid_exponent
+CMP R2,#0x00
+BEQ branch_00c8
+CMP R0,R8
+BLES branch_00c8
+MOV R8,R0
+branch_00c8:
+ADD ER4,#0x14
+ADD R12,#0xFF
+CMP R12,#0x00
+BEQ branch_00d4
+JMP branch_00ba
+branch_00d4:
+CMP R8,#0x80
+BNE branch_00da
+MOV R8,#0x00
+branch_00da:
+MOV R13,#0x00
+L R4,-4[FP]
+L R5,-3[FP]
+ADD ER4,#0x0C
+L R12,-14[FP]
+branch_00e4:
+CALL graph_bcd_15_to_fixed_64
+CMP R2,#0x00
+BNE branch_00f0
+JMP branch_014a
+branch_00f0:
+CMP R13,#0x00
+BNE branch_0112
+MOV ER6,ER14
+ADD ER6,#0x50
+MOV ER10,ER14
+ADD ER10,#0x48
+CALL graph_copy_64
+MOV ER6,ER14
+ADD ER6,#0x50
+MOV ER10,ER14
+ADD ER10,#0x40
+CALL graph_copy_64
+MOV R13,#0x01
+JMP branch_014a
+branch_0112:
+MOV ER6,ER14
+ADD ER6,#0x50
+MOV ER10,ER14
+ADD ER10,#0x48
+CALL graph_compare_64
+CMP R0,#0x00
+BGES branch_012e
+MOV ER6,ER14
+ADD ER6,#0x50
+MOV ER10,ER14
+ADD ER10,#0x48
+CALL graph_copy_64
+branch_012e:
+MOV ER6,ER14
+ADD ER6,#0x50
+MOV ER10,ER14
+ADD ER10,#0x40
+CALL graph_compare_64
+CMP R0,#0x00
+BLES branch_014a
+MOV ER6,ER14
+ADD ER6,#0x50
+MOV ER10,ER14
+ADD ER10,#0x40
+CALL graph_copy_64
+branch_014a:
+ADD ER4,#0x14
+ADD R12,#0xFF
+CMP R12,#0x00
+BEQ branch_0156
+JMP branch_00e4
+branch_0156:
+CMP R13,#0x00
+BNE branch_015e
+JMP branch_0278
+branch_015e:
+MOV ER6,ER14
+ADD ER6,#0x40
+MOV ER10,ER14
+ADD ER10,#0x48
+CALL graph_compare_64
+ST R0,-22[FP]
+MOV ER6,ER14
+ADD ER6,#0x40
+MOV ER10,ER14
+ADD ER10,#0x50
+ADD ER10,#0x68
+CALL graph_copy_64
+MOV ER6,ER14
+ADD ER6,#0x50
+ADD ER6,#0x68
+MOV ER10,ER14
+ADD ER10,#0x48
+CALL graph_subtract_64
+CALL graph_zero_64
+CALL 0x0:0x409A
+MOV ER6,ER14
+ADD ER6,#0x48
+MOV ER10,ER14
+ADD ER10,#0x50
+CALL graph_compare_64
+CMP R0,#0x00
+BLES branch_01a4
+JMP branch_01ce
+branch_01a4:
+MOV ER6,ER14
+ADD ER6,#0x40
+MOV ER10,ER14
+ADD ER10,#0x50
+CALL graph_compare_64
+CMP R0,#0x00
+BGES branch_01b8
+JMP branch_01ce
+branch_01b8:
+CALL graph_zero_axis_pixel
+MOV R6,R0
+MOV R7,#0x00
+branch_01c0:
+MOV R0,R7
+MOV R1,R6
+CALL 0x0:0x431C
+ADD R7,#0x01
+CMP R7,#0x60
+BLTS branch_01c0
+branch_01ce:
+L R4,-4[FP]
+L R5,-3[FP]
+ADD ER4,#0x02
+MOV R2,#0x04
+L R0,R2:[ER4]
+CMP R0,#0x00
+BEQ branch_01e2
+JMP branch_01f4
+branch_01e2:
+MOV R6,#0x00
+MOV R7,#0x00
+branch_01e6:
+MOV R0,R6
+MOV R1,R7
+CALL 0x0:0x431C
+ADD R7,#0x01
+CMP R7,#0x20
+BLTS branch_01e6
+branch_01f4:
+MOV R13,#0x00
+L R4,-4[FP]
+L R5,-3[FP]
+ADD ER4,#0x0C
+L R12,-14[FP]
+CMP R12,#0x01
+BNE branch_020a
+MOV R0,#0x30
+ST R0,-28[FP]
+JMP branch_0218
+branch_020a:
+MOV R0,#0x00
+ST R0,-28[FP]
+ST R0,-30[FP]
+ST R0,-31[FP]
+MOV R0,R12
+ADD R0,#0xFF
+ST R0,-24[FP]
+branch_0218:
+CALL graph_y_pixel_64
+CMP R2,#0x00
+BNE branch_0226
+MOV R13,#0x00
+JMP branch_022e
+branch_0226:
+CALL graph_plot_sample
+JMP branch_022e
+branch_022e:
+ADD ER4,#0x14
+ADD R12,#0xFF
+CMP R12,#0x00
+BNE branch_023a
+JMP branch_0266
+branch_023a:
+L R0,-30[FP]
+L R1,-31[FP]
+MOV R2,#0x5F
+ADD R0,R2
+ADDC R1,#0x00
+L R7,-24[FP]
+branch_0246:
+CMP R1,#0x00
+BNE branch_024e
+CMP R0,R7
+BLT branch_025e
+branch_024e:
+MOV R3,#0x00
+SUB R0,R7
+SUBC R1,R3
+L R2,-28[FP]
+ADD R2,#0x01
+ST R2,-28[FP]
+JMP branch_0246
+branch_025e:
+ST R0,-30[FP]
+ST R1,-31[FP]
+JMP branch_0218
+branch_0266:
+CALL rom_refresh
+branch_026a:
+CALL scanner_address
+CMP R0,#0xFA
+BNE branch_026a
+MOV R0,#0x01
+JMP branch_027a
+branch_0278:
+MOV R0,#0x00
+branch_027a:
+POP ER12
+POP XR8
+POP XR4
+MOV SP,ER14
+POP ER14
+POP PC

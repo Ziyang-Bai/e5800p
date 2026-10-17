@@ -1,0 +1,700 @@
+; basic_graphics
+; BASIC framebuffer operations; only REFRESH transfers the canvas to LCD.
+; CPU 0xFC530, physical 0x7C530, 1560 bytes
+rom_refresh EQU 0x043BE
+small_text_address EQU 0xF9000
+rom_draw_text EQU 0x041DA
+
+basic_graphics:
+PUSH ER0
+MOV ER0,SP
+CMP R0,#0x52
+CMPC R1,#0x83
+BGE stack_ok
+POP ER0
+MOV ER0,#0x06
+RET
+stack_ok:
+POP ER0
+PUSH LR
+PUSH XR4
+PUSH QR8
+ADD SP,#0xB0
+MOV ER14,SP
+ST ER4,0x0000[ER14]
+ST R0,0x0002[ER14]
+MOV ER12,ER2
+L ER0,0x0000[ER12]
+ST ER0,0x0004[ER14]
+L ER0,0x0004[ER12]
+ST ER0,0x0006[ER14]
+L ER0,0x0008[ER12]
+ST ER0,0x0008[ER14]
+L ER0,0x000C[ER12]
+ST ER0,0x000A[ER14]
+L ER0,0x0010[ER12]
+ST ER0,0x000C[ER14]
+L ER0,0x0014[ER12]
+ST ER0,0x000E[ER14]
+L R0,0x0012[ER12]
+ST R0,0x001E[ER14]
+L R0,0x0002[ER14]
+CMP R0,#0x10
+BNE skip_1
+JMP cls
+skip_1:
+CMP R0,#0x11
+BNE skip_2
+JMP pset
+skip_2:
+CMP R0,#0x0C
+BNE skip_3
+JMP point
+skip_3:
+CMP R0,#0x12
+BNE skip_4
+JMP line
+skip_4:
+CMP R0,#0x13
+BNE skip_5
+JMP line
+skip_5:
+CMP R0,#0x14
+BNE skip_6
+JMP blit
+skip_6:
+CMP R0,#0x15
+BNE skip_7
+JMP text
+skip_7:
+CMP R0,#0x16
+BNE skip_8
+JMP refresh
+skip_8:
+JMP argument
+cls:
+MOV R8,#0xEC
+MOV R9,#0x80
+MOV R10,#0x74
+MOV R11,#0x01
+MOV R0,#0x00
+cls_byte:
+ST R0,[ER8]
+ADD ER8,#0x01
+ADD ER10,#0x7F
+BNE cls_byte
+JMP success
+refresh:
+CALL rom_refresh
+JMP success
+pset:
+L ER0,0x0008[ER14]
+CMP R1,#0x00
+BEQ skip_9
+JMP argument
+skip_9:
+CMP R0,#0x03
+BLT skip_10
+JMP argument
+skip_10:
+ST R0,0x0003[ER14]
+JMP point_bounds
+point:
+MOV R0,#0x03
+ST R0,0x0003[ER14]
+point_bounds:
+L ER0,0x0004[ER14]
+CMP R1,#0x00
+BEQ skip_11
+JMP success
+skip_11:
+CMP R0,#0x60
+BLT skip_12
+JMP success
+skip_12:
+L ER0,0x0006[ER14]
+CMP R1,#0x00
+BEQ skip_13
+JMP success
+skip_13:
+CMP R0,#0x1F
+BLT skip_14
+JMP success
+skip_14:
+L R0,0x0004[ER14]
+L R1,0x0006[ER14]
+L R2,0x0003[ER14]
+CALL pixel
+JMP value
+line:
+rect:
+L ER0,0x000C[ER14]
+CMP R1,#0x00
+BEQ skip_15
+JMP argument
+skip_15:
+CMP R0,#0x03
+BLT skip_16
+JMP argument
+skip_16:
+ST R0,0x0003[ER14]
+L ER0,0x0004[ER14]
+CMP R1,#0x00
+BEQ skip_17
+JMP argument
+skip_17:
+CMP R0,#0x60
+BLT skip_18
+JMP argument
+skip_18:
+L ER0,0x0006[ER14]
+CMP R1,#0x00
+BEQ skip_19
+JMP argument
+skip_19:
+CMP R0,#0x1F
+BLT skip_20
+JMP argument
+skip_20:
+L ER0,0x0008[ER14]
+CMP R1,#0x00
+BEQ skip_21
+JMP argument
+skip_21:
+CMP R0,#0x60
+BLT skip_22
+JMP argument
+skip_22:
+L ER0,0x000A[ER14]
+CMP R1,#0x00
+BEQ skip_23
+JMP argument
+skip_23:
+CMP R0,#0x1F
+BLT skip_24
+JMP argument
+skip_24:
+L R8,0x0004[ER14]
+L R9,0x0006[ER14]
+L R10,0x0008[ER14]
+L R11,0x000A[ER14]
+L R12,0x0003[ER14]
+L R0,0x0002[ER14]
+CMP R0,#0x13
+BNE skip_25
+JMP rectangle
+skip_25:
+MOV ER4,#0x00
+MOV R4,R10
+MOV ER0,#0x00
+MOV R0,R8
+SUB R4,R0
+SUBC R5,R1
+MOV ER2,#0x01
+BGE dx_ready
+MOV ER4,#0x00
+MOV R4,R8
+MOV R0,R10
+SUB R4,R0
+SUBC R5,R1
+MOV R2,#0xFF
+MOV R3,#0xFF
+dx_ready:
+ST ER2,0x0016[ER14]
+MOV ER6,#0x00
+MOV R6,R9
+MOV ER0,#0x00
+MOV R0,R11
+SUB R6,R0
+SUBC R7,R1
+MOV ER2,#0x01
+BLT dy_ready
+MOV ER6,#0x00
+MOV R6,R11
+MOV R0,R9
+SUB R6,R0
+SUBC R7,R1
+MOV R2,#0xFF
+MOV R3,#0xFF
+dy_ready:
+ST ER2,0x0018[ER14]
+MOV ER0,ER4
+ADD ER0,ER6
+ST ER0,0x001A[ER14]
+line_pixel:
+MOV R0,R8
+MOV R1,R9
+MOV R2,R12
+CALL pixel
+MOV R0,R8
+CMP R0,R10
+BNE skip_26
+MOV R0,R9
+CMP R0,R11
+BNE skip_26
+JMP success
+skip_26:
+line_step:
+L ER0,0x001A[ER14]
+ADD ER0,ER0
+ST ER0,0x001C[ER14]
+CMP ER0,ER6
+BLTS line_y
+L ER0,0x001A[ER14]
+ADD ER0,ER6
+ST ER0,0x001A[ER14]
+L R0,0x0016[ER14]
+ADD R8,R0
+line_y:
+L ER0,0x001C[ER14]
+CMP ER4,ER0
+BLTS line_pixel
+L ER0,0x001A[ER14]
+ADD ER0,ER4
+ST ER0,0x001A[ER14]
+L R0,0x0018[ER14]
+ADD R9,R0
+JMP line_pixel
+rectangle:
+CMP R8,R10
+BLT rect_x
+MOV R0,R8
+MOV R8,R10
+MOV R10,R0
+rect_x:
+CMP R9,R11
+BLT rect_y
+MOV R0,R9
+MOV R9,R11
+MOV R11,R0
+rect_y:
+MOV R13,R8
+ST R9,0x0012[ER14]
+rect_horizontal:
+MOV R0,R8
+MOV R1,R9
+MOV R2,R12
+CALL pixel
+CMP R9,R11
+BEQ rect_next_x
+MOV R9,R11
+MOV R0,R8
+MOV R1,R9
+MOV R2,R12
+CALL pixel
+L R9,0x0012[ER14]
+rect_next_x:
+CMP R8,R10
+BEQ rect_sides
+ADD R8,#0x01
+JMP rect_horizontal
+rect_sides:
+ADD R9,#0x01
+CMP R9,R11
+BLT skip_27
+JMP success
+skip_27:
+MOV R8,R13
+MOV R0,R8
+MOV R1,R9
+MOV R2,R12
+CALL pixel
+CMP R8,R10
+BEQ rect_sides
+MOV R8,R10
+MOV R0,R8
+MOV R1,R9
+MOV R2,R12
+CALL pixel
+JMP rect_sides
+blit:
+L ER0,0x000E[ER14]
+CMP R1,#0x00
+BEQ skip_28
+JMP argument
+skip_28:
+CMP R0,#0x03
+BLT skip_29
+JMP argument
+skip_29:
+ST R0,0x0003[ER14]
+L ER0,0x0004[ER14]
+CMP R1,#0x00
+BEQ skip_30
+JMP argument
+skip_30:
+CMP R0,#0x60
+BLT skip_31
+JMP argument
+skip_31:
+L ER0,0x0006[ER14]
+CMP R1,#0x00
+BEQ skip_32
+JMP argument
+skip_32:
+CMP R0,#0x1F
+BLT skip_33
+JMP argument
+skip_33:
+L ER0,0x0008[ER14]
+CMP R1,#0x00
+BEQ skip_34
+JMP argument
+skip_34:
+CMP R0,#0x61
+BLT skip_35
+JMP argument
+skip_35:
+L ER0,0x000A[ER14]
+CMP R1,#0x00
+BEQ skip_36
+JMP argument
+skip_36:
+CMP R0,#0x21
+BLT skip_37
+JMP argument
+skip_37:
+L R0,0x0008[ER14]
+CMP R0,#0x00
+BNE skip_38
+JMP argument
+skip_38:
+L R0,0x000A[ER14]
+CMP R0,#0x00
+BNE skip_39
+JMP argument
+skip_39:
+L R0,0x0008[ER14]
+ADD R0,#0x07
+SRL R0,#0x03
+L R2,0x000A[ER14]
+MUL ER0,R2
+ST ER0,0x0010[ER14]
+MOV ER4,ER0
+L ER0,0x000C[ER14]
+L R2,0x001E[ER14]
+CALL 0xF:0xB53C
+CMP R0,#0x00
+BEQ skip_40
+JMP argument
+skip_40:
+L ER8,0x000C[ER14]
+L R10,0x001E[ER14]
+CMP R10,#0x00
+BNE blit_ready
+MOV R0,#0x60
+MOV R1,#0x82
+CMP ER8,ER0
+BGE blit_ready
+MOV ER0,ER8
+L ER2,0x0010[ER14]
+ADD ER0,ER2
+MOV R2,#0xED
+MOV R3,#0x80
+CMP ER0,ER2
+BLT blit_ready
+MOV ER0,SP
+MOV R2,#0x36
+MOV R3,#0x84
+CMP ER0,ER2
+BGE skip_41
+JMP memory
+skip_41:
+ADD SP,#0x80
+ADD SP,#0x80
+ADD SP,#0x80
+MOV ER4,SP
+L ER6,0x0010[ER14]
+snapshot:
+L R0,[ER8]
+ST R0,[ER4]
+ADD ER8,#0x01
+ADD ER4,#0x01
+ADD ER6,#0x7F
+BNE snapshot
+MOV ER8,SP
+blit_ready:
+MOV R13,#0x00
+blit_row:
+MOV R12,#0x00
+blit_column:
+MOV R0,R12
+AND R0,#0x07
+BNE blit_bit
+DW 0x9A0F
+L R11,[ER8]
+ADD ER8,#0x01
+BNE blit_bit
+ADD R10,#0x01
+blit_bit:
+L R0,0x0004[ER14]
+ADD R0,R12
+CMP R0,#0x60
+BGE blit_next
+L R1,0x0006[ER14]
+ADD R1,R13
+CMP R1,#0x1F
+BGE blit_next
+L R2,0x0003[ER14]
+CMP R11,#0x80
+BGE blit_set
+CMP R2,#0x00
+BNE blit_next
+JMP blit_plot
+blit_set:
+CMP R2,#0x00
+BNE blit_plot
+MOV R2,#0x01
+blit_plot:
+CALL pixel
+blit_next:
+SLL R11,#0x01
+ADD R12,#0x01
+L R0,0x0008[ER14]
+CMP R12,R0
+BLT blit_column
+ADD R13,#0x01
+L R0,0x000A[ER14]
+CMP R13,R0
+BLT blit_row
+JMP success
+text:
+L ER0,0x0004[ER14]
+CMP R1,#0x00
+BEQ skip_42
+JMP argument
+skip_42:
+CMP R0,#0x60
+BLT skip_43
+JMP argument
+skip_43:
+L ER0,0x000A[ER14]
+CMP R1,#0x00
+BEQ skip_44
+JMP argument
+skip_44:
+CMP R0,#0x02
+BLT skip_45
+JMP argument
+skip_45:
+L R0,0x000A[ER14]
+CMP R0,#0x00
+BNE text_regular_bounds
+L ER0,0x0006[ER14]
+CMP R1,#0x00
+BEQ skip_46
+JMP argument
+skip_46:
+CMP R0,#0x1B
+BLT skip_47
+JMP argument
+skip_47:
+L R0,0x0004[ER14]
+AND R0,#0x03
+BEQ skip_48
+JMP argument
+skip_48:
+JMP skip_50
+text_regular_bounds:
+L ER0,0x0006[ER14]
+CMP R1,#0x00
+BEQ skip_49
+JMP argument
+skip_49:
+CMP R0,#0x19
+BLT skip_50
+JMP argument
+skip_50:
+text_copy:
+L ER8,0x0008[ER14]
+MOV ER10,ER14
+ADD ER10,#0x20
+L R6,0x000C[ER14]
+CMP R6,#0x21
+BLT skip_51
+JMP argument
+skip_51:
+CMP R6,#0x00
+BEQ text_nul
+text_byte:
+L R0,[ER8]
+ST R0,[ER10]
+ADD ER8,#0x01
+ADD ER10,#0x01
+ADD R6,#0xFF
+BNE text_byte
+text_nul:
+MOV R0,#0x00
+ST R0,[ER10]
+L R0,0x80A0
+ST R0,0x0042[ER14]
+L R0,0x80A1
+ST R0,0x0043[ER14]
+L R0,0x80A2
+ST R0,0x0044[ER14]
+MOV R0,#0x07
+ST R0,0x80A0
+MOV R0,#0x00
+ST R0,0x80A1
+MOV R0,#0x01
+ST R0,0x80A2
+L R0,0x000A[ER14]
+CMP R0,#0x00
+BNE text_rom
+L R0,0x0004[ER14]
+L R1,0x0006[ER14]
+ADD R1,#0x01
+MOV ER2,ER14
+ADD ER2,#0x20
+CALL small_text_address
+JMP text_restore
+text_rom:
+L R0,0x0004[ER14]
+L R1,0x0006[ER14]
+ADD R1,#0x01
+MOV ER2,ER14
+ADD ER2,#0x20
+CALL rom_draw_text
+MOV R8,R0
+MOV R1,#0x00
+MOV ER2,ER14
+ADD ER2,#0x20
+ADD ER2,ER0
+L R0,[ER2]
+CMP R0,#0x00
+BNE skip_52
+JMP text_restore
+skip_52:
+ST R0,0x0046[ER14]
+MOV R0,#0x00
+ST R0,0x0047[ER14]
+MOV R0,R8
+MOV R2,#0x06
+MUL ER0,R2
+L R2,0x0004[ER14]
+ADD R0,R2
+CMP R0,#0x60
+BLT skip_53
+JMP text_restore
+skip_53:
+MOV R12,R0
+AND R12,#0x07
+L R0,0x0006[ER14]
+MOV R2,#0x0C
+MUL ER0,R2
+MOV R8,#0xEC
+MOV R9,#0x80
+ADD ER8,ER0
+MOV ER10,ER14
+ADD ER10,#0x10
+MOV R13,#0x07
+text_save_edge:
+L R0,[ER8]
+ST R0,[ER10]
+ADD ER8,#0x0C
+ADD ER10,#0x01
+ADD R13,#0xFF
+BNE text_save_edge
+MOV R0,#0x00
+L R1,0x0006[ER14]
+ADD R1,#0x01
+MOV ER2,ER14
+ADD ER2,#0x23
+ADD ER2,#0x23
+CALL rom_draw_text
+ADD ER8,#0x44
+ADD ER8,#0x68
+MOV ER10,ER14
+ADD ER10,#0x10
+MOV R13,#0x07
+text_merge_edge:
+L R0,[ER8]
+L R1,[ER10]
+ST R1,[ER8]
+SRL R0,R12
+MOV R1,#0xFF
+SRL R1,R12
+XOR R1,#0xFF
+MOV ER2,ER8
+ADD ER2,#0x0B
+L R3,[ER2]
+AND R3,R1
+OR R0,R3
+ST R0,[ER2]
+ADD ER8,#0x0C
+ADD ER10,#0x01
+ADD R13,#0xFF
+BNE text_merge_edge
+text_restore:
+L R0,0x0042[ER14]
+ST R0,0x80A0
+L R0,0x0043[ER14]
+ST R0,0x80A1
+L R0,0x0044[ER14]
+ST R0,0x80A2
+JMP success
+argument:
+MOV ER0,#0x04
+JMP exit
+memory:
+MOV ER0,#0x06
+JMP exit
+success:
+MOV R0,#0x00
+value:
+MOV R1,#0x00
+L ER2,0x0000[ER14]
+ST ER0,[ER2]
+ADD ER2,#0x02
+MOV ER0,#0x00
+ST ER0,[ER2]
+exit:
+MOV ER2,ER14
+ADD ER2,#0x28
+ADD ER2,#0x28
+MOV SP,ER2
+POP QR8
+POP XR4
+POP PC
+pixel:
+PUSH XR4
+MOV R6,R2
+MOV R2,R0
+AND R2,#0x07
+MOV R3,#0x80
+SRL R3,R2
+MOV R4,R1
+MOV R1,#0x00
+SRL R0,#0x03
+MOV R2,#0x0C
+MUL ER4,R2
+ADD ER4,ER0
+MOV R0,#0xEC
+MOV R1,#0x80
+ADD ER4,ER0
+L R0,[ER4]
+CMP R6,#0x03
+BEQ pixel_query
+CMP R6,#0x00
+BEQ pixel_clear
+CMP R6,#0x01
+BEQ pixel_set
+XOR R0,R3
+JMP pixel_write
+pixel_set:
+OR R0,R3
+JMP pixel_write
+pixel_clear:
+XOR R3,#0xFF
+AND R0,R3
+pixel_write:
+ST R0,[ER4]
+MOV R0,#0x00
+JMP pixel_done
+pixel_query:
+AND R0,R3
+BEQ pixel_done
+MOV R0,#0x01
+pixel_done:
+POP XR4
+RET

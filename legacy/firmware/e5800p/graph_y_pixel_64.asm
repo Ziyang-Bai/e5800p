@@ -1,0 +1,62 @@
+; graph_y_pixel_64
+; CPU 0x82380, physical 0x02380, 114 bytes
+graph_bcd_15_to_fixed_64 EQU 0x82200
+graph_copy_64 EQU 0x82100
+graph_subtract_64 EQU 0x82180
+graph_multiply_31 EQU 0x82340
+
+graph_y_pixel_64:
+PUSH LR
+PUSH ER12
+CALL graph_bcd_15_to_fixed_64
+CMP R2,#0x00
+BEQ branch_006c
+L R0,-22[FP]
+CMP R0,#0x00
+BNE branch_0018
+MOV R0,#0x10
+JMP branch_006a
+branch_0018:
+MOV ER6,ER14
+ADD ER6,#0x40
+MOV ER10,ER14
+ADD ER10,#0x50
+ADD ER10,#0x60
+CALL graph_copy_64
+MOV ER6,ER14
+ADD ER6,#0x50
+ADD ER6,#0x60
+MOV ER10,ER14
+ADD ER10,#0x50
+CALL graph_subtract_64
+MOV ER6,ER14
+ADD ER6,#0x50
+ADD ER6,#0x60
+MOV ER10,ER14
+ADD ER10,#0x50
+ADD ER10,#0x58
+CALL graph_copy_64
+CALL graph_multiply_31
+MOV R12,#0x00
+branch_004a:
+MOV ER6,ER14
+ADD ER6,#0x50
+ADD ER6,#0x58
+MOV ER10,ER14
+ADD ER10,#0x50
+ADD ER10,#0x68
+CALL 0x8:0x2126
+CMP R0,#0x00
+BLTS branch_0068
+CALL graph_subtract_64
+ADD R12,#0x01
+CMP R12,#0x1F
+BLTS branch_004a
+branch_0068:
+MOV R0,R12
+branch_006a:
+MOV R2,#0x01
+branch_006c:
+POP ER12
+POP LR
+RET
