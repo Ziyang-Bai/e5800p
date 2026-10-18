@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "5800p-kits"
 version = "0.1.0"
-description = "Python firmware descriptions and nXu8 code generation for fx-5800P"
+description = "PL/e compiler and nXu8 tools for fx-5800P"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {file = "LICENSE"}

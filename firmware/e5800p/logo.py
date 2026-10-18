@@ -25,7 +25,7 @@ def install(fw):
     fw._sources.add(str(PBM_PATH))
     fw.data('logo_bitmap', read_logo(), address=0x81C86, labels=LOGO_BITMAP_LABELS)
 
-    @fw.function(native=True, address=0x81A86)
+    @fw.function(native=True, address=0x81800)
     def logo():
         cpu.label('logo')
         cpu.push(cpu.lr)
@@ -33,6 +33,10 @@ def install(fw):
         cpu.er2 = cpu.sp
         cpu.er2 += 0x04
         cpu.er0 = cpu.mem16[cpu.er2]
+        cpu.compare(cpu.r0, 0x58)
+        cpu.compare_carry(cpu.r1, 0x77)
+        if cpu.eq:
+            cpu.branch('develop')
         cpu.compare(cpu.r0, 0xD6)
         cpu.compare_carry(cpu.r1, 0x59)
         if cpu.ne:
@@ -64,6 +68,20 @@ def install(fw):
         cpu.call(ROM_REFRESH)
         cpu.pop(cpu.lr)
         cpu.jump(0x059F6)
+        cpu.label('develop')
+        cpu.er2 += 0x02
+        cpu.er0 = cpu.mem16[cpu.er2]
+        cpu.er0 = cpu.er0
+        if cpu.ne:
+            cpu.branch('ordinary')
+        cpu.pop(cpu.xr0)
+        cpu.call('save')
+        cpu.push(cpu.er14)
+        cpu.call(0x1210A)
+        cpu.call('fn_develop_menu')
+        cpu.pop(cpu.er14)
+        cpu.pop(cpu.lr)
+        cpu.jump(0x07760)
         cpu.label('ordinary')
         cpu.pop(cpu.xr0)
         cpu.pop(cpu.lr)

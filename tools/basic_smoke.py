@@ -30,17 +30,36 @@ class Emulator(MCPClient):
         if self.memory(0, 0x8000) != rom[:0x8000] or self.memory(0x10000, 0x10000) != rom[0x10000:]:
             raise ValueError("Running ROM differs from the validation model")
 
+    def keys(self, *codes):
+        for code in codes:
+            if code not in (0x70, 0x26):
+                deadline = time.monotonic() + 10
+                while True:
+                    status = self.call("get_status")
+                    if status["paused"] or status["run_status"] == 0:
+                        break
+                    if time.monotonic() >= deadline:
+                        raise AssertionError(("Native input wait not reached", code, status))
+                    time.sleep(0.05)
+            super().keys(code)
+            # ROM-A27's roughly 581 ms held-key poll must observe release.
+            time.sleep(0.5)
+
 
     def records(self):
         data = self.memory(0x40000, 0x8000)
         records = {}
-        # This isolated fixture's system folder array starts at0128.
-        for off in range(0x128, 0x8000 - 24, 24):
+        # ROM-A27's system folder holds the directory address and entry count.
+        base = int.from_bytes(data[0x6c:0x70], "little") - 0x40000
+        count = int.from_bytes(data[0x70:0x74], "little")
+        if not 0 <= base <= base + count * 24 <= len(data):
+            raise ValueError("Unexpected native directory")
+        for off in range(base, base + count * 24, 24):
             record = data[off:off + 24]
             if record[20] != 0x47:
-                break
+                continue
             name = record[:12].split(b"\0", 1)[0].decode("ascii")
-            start = 0x128 + int.from_bytes(record[12:16], "little")
+            start = base + int.from_bytes(record[12:16], "little")
             size = int.from_bytes(record[16:20], "little")
             if not 6 <= size <= 0x8000 - start:
                 raise ValueError("Unexpected native file allocation")
@@ -961,29 +980,53 @@ def control_cases(emu, out):
 
 def main():
     # Create keyboard-driven fixtures before probes take over the CPU return path.
+    from basic_smoke_graph import graph_abi_cases, addin_abi_cases, _comp
+    from basic_smoke_graph_features import graph_cases
+    from basic_smoke_apps import addin_cases, _idle
+
     cases = {"native": native, "tokens": token_cases, "control": control_cases,
              "regression": regression_cases, "asm": asm_cases,
              "expressions": expression_cases, "codec": codec, "memory": memory_cases,
-             "call": call_cases, "graphics": graphics_cases, "flash": flash_cases}
+             "call": call_cases, "graphics": graphics_cases, "flash": flash_cases,
+             "graph-abi": graph_abi_cases, "addin-abi": addin_abi_cases,
+             "graph": graph_cases, "addin": addin_cases}
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--case", choices=(*cases, "all"), required=True)
     parser.add_argument("--model", type=Path, required=True)
     parser.add_argument("--out", type=Path, required=True)
+    parser.add_argument("--original", type=Path,
+                        help="original Flash for Add-in native-library acceptance")
     args = parser.parse_args()
     if args.out.exists():
         parser.error("Choose a new evidence directory")
+    if args.case in ("all", "addin") and args.original is None:
+        parser.error("--case all/addin requires --original")
+    original = args.original.read_bytes() if args.original is not None else None
+    if original is not None and len(original) != 0x80000:
+        parser.error("--original must contain 524288 bytes")
     emu = Emulator(args.model)
+    emu.original = original
     args.out.mkdir(parents=True)
     emu.call("reset")
     emu.call("resume")
     time.sleep(1)
+    _comp(emu)
+    _idle(emu)
+    emu.call("resume")
     snapshot = emu.call("save_snapshot", label="Before BASIC smoke")["id"]
     flash = b"".join(emu.memory(0x80000 + offset, 32768)
                      for offset in range(0, 524288, 32768))
     args.out.joinpath("before-flash.bin").write_bytes(flash)
     try:
         results = {}
-        for name in cases if args.case == "all" else (args.case,):
+        for index, name in enumerate(cases if args.case == "all" else (args.case,)):
+            if index:
+                emu.call("reset")
+                emu.call("resume")
+                time.sleep(1)
+                _comp(emu)
+                _idle(emu)
+                emu.call("resume")
             destination = args.out / name if args.case == "all" else args.out
             destination.mkdir(exist_ok=True)
             result = cases[name](emu, destination)

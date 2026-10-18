@@ -1,4 +1,4 @@
-"""Compile the integer firmware subset of Python to nX-U8 assembly.
+"""Compile PL/e functions to nX-U8 assembly.
 
 Locals are word slots below ER14. Expressions return ER0 and use the stack
 for live operands; no Python body or user descriptor is executed by compilation.

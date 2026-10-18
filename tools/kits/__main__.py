@@ -1,4 +1,4 @@
-"""Build a firmware project declared in a Python file."""
+"""Build a firmware project written in PL/e."""
 
 import argparse
 from pathlib import Path
@@ -9,7 +9,7 @@ from build_e5800p import load_project
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('project', type=Path, help='Python file declaring one Firmware object')
+    parser.add_argument('project', type=Path, help='PL/e file declaring one Firmware object')
     parser.add_argument('original', type=Path, help='input Flash image; a separate output is created')
     parser.add_argument('-o', '--output', type=Path, help='default: build/<firmware name>.bin')
     parser.add_argument('--listing', type=Path, help='optional generated assembly for inspection')

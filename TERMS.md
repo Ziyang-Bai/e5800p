@@ -1,14 +1,9 @@
-# e5800p
+# 项目术语
 
-本项目区分 BASIC 扩展规范、固件实现和开发工具链。
+e.basic：CASIO BASIC 扩展规范，定义 PEEK/POKE 等内存操作、机器码调用、内联汇编、图形与底层函数的语法和行为。
 
-## 术语
+e5800p：fx-5800P 修改固件，实现 e.basic、GRAPH、ASM/Hex 编辑器等功能。
 
-**e.basic**：
-基于 CASIO BASIC 的扩展规范，约定 PEEK、POKE 等内存操作、机器码调用、内联汇编、图形与底层函数的语法和行为。规范面向 BASIC 程序作者。
+PL/e：基于 Python 的固件编程 DSL，由 5800p-kits 编译为 nXu8 机器码。
 
-**e5800p**：
-面向 fx-5800P 的扩展固件项目，包含 e.basic 的实现，以及提供 TABLE/GRAPH、ASM/Hex 编辑器等功能。
-
-**5800p-kits**：
-随 e5800p 提供的开发工具链，用于编写、构建和调试计算器程序与固件补丁。
+5800p-kits：随 e5800p 提供的 Python 工具链，用于编译 PL/e、构建和调试程序与固件补丁。

@@ -7,6 +7,8 @@ from basic_smoke import DIGITS, LETTERS, scalar_integer
 
 
 def native_cases(emu, out):
+    from basic_smoke_apps import _idle
+
     results = []
     existing = emu.records()
     flash = emu.memory(0x84000, 0x4000)
@@ -41,7 +43,10 @@ def native_cases(emu, out):
             emu.call("write_memory", address=address, bytes=list(scalar_integer(99)))
         emu.keys(0x07, DIGITS[1], 0x07, DIGITS[5], DIGITS[1], DIGITS[2])
         index = list(emu.records()).index(parent)
-        emu.keys(*([0x47] * index), 0x63)
+        for code in (*([0x47] * index), 0x63):
+            _idle(emu)
+            emu.call("resume")
+            emu.keys(code)
 
     def wait_value(address, value, finished=False):
         deadline = time.monotonic() + 20

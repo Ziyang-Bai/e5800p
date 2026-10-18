@@ -34,6 +34,11 @@ jobs:
         env:
           PYTHONPATH: ''
         run: python "${{ github.workspace }}/tests/test_casio_tool.py" BuildTests -v
+      - name: Build and install S4 apps with installed package
+        working-directory: ${{ runner.temp }}
+        env:
+          PYTHONPATH: ''
+        run: python "${{ github.workspace }}/tests/test_casio_tool.py" AppTests -v
       - name: Compile bundled firmware
         working-directory: ${{ runner.temp }}
         env:

@@ -14,11 +14,10 @@ BASIC__DISPLAY_CCB16 = 0xF4FFE
 BASIC__DISPLAY_CCF82 = 0xF5072
 BASIC__DISPLAY_CD268 = 0xF5038
 BASIC__STATEMENT = 0xF3FB2
-LOGO_ADDRESS = 0x81A86
+LOGO_ADDRESS = 0x81800
 BASIC__DISPLAY_DECODE = 0xF50B4
 BASIC__NATIVE_MENU_KEY = 0xF5116
 BASIC__SPELL = 0xF3EE4
-GRAPH_TABLE_GATE = 0x81100
 BASIC__SCAN_IF = 0xF4952
 BASIC__SCAN_ELSE = 0xF496C
 BASIC__SCAN_FOR = 0xF49A0
@@ -174,10 +173,9 @@ def install(fw):
         cpu.jump(BASIC__SPELL)
 
 
-    @fw.function(native=True, address=0xE3694)
-    def native_table():
-        cpu.label('native_table')
-        cpu.jump(GRAPH_TABLE_GATE)
+    @fw.function(native=True, address=0xCFA0E)
+    def hook_graph_mode_cfa0e():
+        cpu.jump('fn_graph_mode_gate')
 
 
     @fw.function(native=True, address=0xE5FCE)

@@ -119,6 +119,66 @@ def build_image(base, output, *, project=None, clean=None, map_path=None):
             'map': str(map_path) if map_path else None}
 
 
+def app(args):
+    from build_e5800p import load_project
+    from kits.app import (
+        S4_ADDRESS, S4_OFFSET, S4_SIZE, build_app, init_image, install_app,
+        read_apps, remove_app, restore_s4,
+    )
+
+    if args.action == 'build':
+        fw = load_project(args.project)
+        output_paths([args.project, *fw.source_inputs()], [args.output, args.listing])
+        data, listing = build_app(fw, entry=args.entry, work_bytes=args.work_bytes,
+                                  stack_bytes=args.stack_bytes)
+        write_binary(args.output, data)
+        if args.listing:
+            args.listing.write_text(listing, encoding='utf-8')
+        return {'output': str(args.output), 'size': len(data), 'sha256': digest(data)}
+
+    data = args.image.read_bytes()
+    if args.action == 'list':
+        return [
+            {**{key: row[key] for key in ('name', 'load_address', 'payload_size',
+                                          'work_bytes', 'stack_bytes', 'modified')},
+             'entry_address': row['load_address'] + row['entry_offset']}
+            for row in read_apps(data)
+        ]
+
+    inputs = [args.image]
+    outputs = [args.output]
+    if args.action == 'init':
+        outputs.append(args.backup_s4)
+    elif args.action == 'install':
+        inputs.append(args.package)
+    elif args.action == 'restore':
+        inputs.append(args.backup)
+    output_paths(inputs, outputs)
+    result = {'input': str(args.image), 'output': str(args.output),
+              'input_sha256': digest(data)}
+    if args.action == 'init':
+        changed = init_image(data)
+        backup = data[S4_OFFSET:S4_OFFSET + S4_SIZE]
+        with args.backup_s4.open('xb') as stream:
+            stream.write(backup)
+        result.update(backup_s4=str(args.backup_s4), backup_sha256=digest(backup))
+    elif args.action == 'install':
+        changed = install_app(data, args.package.read_bytes(), replace=args.replace)
+    elif args.action == 'remove':
+        changed = remove_app(data, args.name)
+    else:
+        backup = args.backup.read_bytes()
+        changed = restore_s4(data, backup)
+        result.update(backup=str(args.backup), backup_sha256=digest(backup),
+                      regions=[dict(file_offset=S4_OFFSET, cpu_start=S4_ADDRESS, size=S4_SIZE)])
+        print(f'Restore S4 SHA-256 {digest(backup)}; '
+              f'CPU [{S4_ADDRESS:#x}, {S4_ADDRESS + S4_SIZE:#x}), '
+              f'image [{S4_OFFSET:#x}, {S4_OFFSET + S4_SIZE:#x})', file=sys.stderr)
+    write_binary(args.output, changed)
+    result.update(size=len(changed), sha256=digest(changed))
+    return result
+
+
 def _powershell(command):
     result = subprocess.run(['powershell', '-NoProfile', '-NonInteractive', '-Command',
                              "$ErrorActionPreference='Stop'; "
@@ -349,12 +409,14 @@ def debug(args):
         return schema_call(client, tools, name, values)
 
 
-def verify(model, out, *, case='all', suite='basic', exe=None):
+def verify(model, out, *, case='all', suite='basic', exe=None, original=None):
     script = Path(__file__).with_name('basic_smoke.py' if suite == 'basic' else 'basic_smoke_power.py')
     command = [sys.executable, str(script), '--model', str(Path(model).resolve()),
                '--out', str(Path(out).resolve())]
     if suite == 'basic':
         command.extend(['--case', case])
+        if original is not None:
+            command.extend(['--original', str(Path(original).resolve())])
     else:
         if exe is None:
             raise ValueError('--suite power requires --exe')
@@ -385,14 +447,42 @@ def parser():
     _range_options(disasm)
     disasm.add_argument('--origin', type=number, help='code address at selected range; required with --offset')
     disasm.add_argument('-o', '--output', type=Path, help='JSON listing (otherwise stdout)')
-    build = commands.add_parser('build', help='compile a Python firmware project')
+    build = commands.add_parser('build', help='compile a PL/e firmware project')
     build.add_argument('base', type=Path)
     build.add_argument('-o', '--output', type=Path, required=True)
     build.add_argument('--project', type=Path,
-                       help='Python project; defaults to bundled e5800p')
+                       help='PL/e project; defaults to bundled e5800p')
     build.add_argument('--clean', type=Path,
                        help='original firmware for upgrading while preserving base native data banks')
     build.add_argument('--map', type=Path)
+    application = commands.add_parser('app', help='build and manage standalone S4 applications')
+    apps = application.add_subparsers(dest='action', required=True)
+    app_build = apps.add_parser('build')
+    app_build.add_argument('project', type=Path)
+    app_build.add_argument('-o', '--output', type=Path, required=True)
+    app_build.add_argument('--entry', default='main')
+    app_build.add_argument('--work-bytes', type=number, default=0)
+    app_build.add_argument('--stack-bytes', type=number, required=True)
+    app_build.add_argument('--listing', type=Path)
+    app_init = apps.add_parser('init')
+    app_init.add_argument('image', type=Path)
+    app_init.add_argument('-o', '--output', type=Path, required=True)
+    app_init.add_argument('--backup-s4', type=Path, required=True)
+    app_list = apps.add_parser('list')
+    app_list.add_argument('image', type=Path)
+    app_install = apps.add_parser('install')
+    app_install.add_argument('image', type=Path)
+    app_install.add_argument('package', type=Path)
+    app_install.add_argument('-o', '--output', type=Path, required=True)
+    app_install.add_argument('--replace', action='store_true')
+    app_remove = apps.add_parser('remove')
+    app_remove.add_argument('image', type=Path)
+    app_remove.add_argument('name')
+    app_remove.add_argument('-o', '--output', type=Path, required=True)
+    app_restore = apps.add_parser('restore')
+    app_restore.add_argument('image', type=Path)
+    app_restore.add_argument('backup', type=Path)
+    app_restore.add_argument('-o', '--output', type=Path, required=True)
     patch = commands.add_parser('patch', help='replace bytes in a separate staged image')
     patch.add_argument('image', type=Path)
     patch.add_argument('data', type=Path)
@@ -453,6 +543,8 @@ def parser():
     verification.add_argument('--case', default='all')
     verification.add_argument('--suite', choices=('basic', 'power'), default='basic')
     verification.add_argument('--exe', type=Path)
+    verification.add_argument('--original', type=Path,
+                              help='original Flash for Add-in native-library acceptance')
     return root
 
 
@@ -463,6 +555,8 @@ def run(args):
     if command == 'build':
         return build_image(args.base, args.output, project=args.project,
                            clean=args.clean, map_path=args.map)
+    if command == 'app':
+        return app(args)
     if command == 'model':
         if args.action == 'clone':
             return clone_model(args.source, args.destination)
@@ -527,7 +621,8 @@ def main(argv=None):
     args = parser().parse_args(argv)
     try:
         if args.command == 'verify':
-            return verify(args.model, args.out, case=args.case, suite=args.suite, exe=args.exe)
+            return verify(args.model, args.out, case=args.case, suite=args.suite,
+                          exe=args.exe, original=args.original)
         emit(run(args))
         return 0
     except (OSError, ValueError, RuntimeError, subprocess.CalledProcessError) as exc:
