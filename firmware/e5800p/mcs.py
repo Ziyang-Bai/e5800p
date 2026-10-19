@@ -1,4 +1,4 @@
-"""Owned GRAPH objects in the native main folder.
+"""Owned GRAPH and numbered BASIC objects in the native main folder.
 
 ER0 points to a segment-0 descriptor. All entries preserve R4..R15; R0 is
 0=OK, 1=full, 2=name used, 3=native error, 4=not found. Returned length is
@@ -131,6 +131,10 @@ def install(fw):
         cpu.compare(cpu.er0, cpu.er4)
         if cpu.ne:
             cpu.jump('collision')
+        cpu.call('fn_mcs_object_name')
+        cpu.er0 = cpu.er0
+        if cpu.eq:
+            cpu.jump('lookup')
         cpu.er0 = cpu.mem16[0, cpu.offset(cpu.er14, 24)]
         cpu.er4 = 0x5247
         cpu.compare(cpu.er0, cpu.er4)
@@ -152,7 +156,10 @@ def install(fw):
         cpu.er4 = 0x5747
         cpu.compare(cpu.er0, cpu.er4)
         if cpu.ne:
-            cpu.jump('collision')
+            cpu.er4 = 0x5742
+            cpu.compare(cpu.er0, cpu.er4)
+            if cpu.ne:
+                cpu.jump('collision')
         cpu.er0 = cpu.mem16[0, cpu.offset(cpu.er14, 26)]
         cpu.er4 = 0x524F
         cpu.compare(cpu.er0, cpu.er4)
@@ -433,5 +440,48 @@ def install(fw):
         cpu.er0 = SUCCESS
         cpu.ret()
         cpu.label('collision')
+        cpu.er0 = NAME_USED
+        cpu.ret()
+
+    @fw.function(native=True)
+    def mcs_object_name():
+        # E5Mhhhh / E5Shhhh; the payload tag follows the namespace, not flags.
+        cpu.r0 = cpu.mem8[0, cpu.offset(cpu.er14, 24)]
+        cpu.er6 = 0x314D
+        cpu.compare(cpu.r0, 0x4D)
+        if cpu.ne:
+            cpu.compare(cpu.r0, 0x53)
+            if cpu.ne:
+                cpu.jump('bad')
+            cpu.er6 = 0x3154
+        cpu.er4 = cpu.er14
+        cpu.er4 += 25
+        cpu.r3 = 4
+        cpu.label('hex')
+        cpu.r0 = cpu.mem8[0, cpu.er4]
+        cpu.compare(cpu.r0, 0x30)
+        if cpu.lt:
+            cpu.jump('bad')
+        cpu.compare(cpu.r0, 0x39)
+        if cpu.le:
+            cpu.branch('next')
+        cpu.compare(cpu.r0, 0x41)
+        if cpu.lt:
+            cpu.jump('bad')
+        cpu.compare(cpu.r0, 0x46)
+        if cpu.gt:
+            cpu.jump('bad')
+        cpu.label('next')
+        cpu.er4 += 1
+        cpu.r3 += 255
+        if cpu.ne:
+            cpu.branch('hex')
+        cpu.r0 = cpu.mem8[0, cpu.er4]
+        cpu.compare(cpu.r0, 0)
+        if cpu.ne:
+            cpu.jump('bad')
+        cpu.er0 = 0
+        cpu.ret()
+        cpu.label('bad')
         cpu.er0 = NAME_USED
         cpu.ret()

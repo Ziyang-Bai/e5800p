@@ -73,19 +73,7 @@ def install(fw):
         cpu.er2 += -1
         if cpu.ne:
             cpu.branch('zero')
-        cpu.r0 = cpu.mem8[0x80A0]
-        cpu.mem8[cpu.offset(cpu.er14, FONT)] = cpu.r0
-        cpu.r0 = cpu.mem8[0x80A1]
-        cpu.mem8[cpu.offset(cpu.er14, FONT + 1)] = cpu.r0
-        cpu.r0 = cpu.mem8[0x80A2]
-        cpu.mem8[cpu.offset(cpu.er14, FONT + 2)] = cpu.r0
-        cpu.r0 = 7
-        cpu.mem8[0x80A0] = cpu.r0
-        cpu.r0 = 0
-        cpu.mem8[0x80A1] = cpu.r0
-        cpu.r0 = 1
-        cpu.mem8[0x80A2] = cpu.r0
-        cpu.call('fn_graph_names')
+        cpu.call('fn_graph_init')
         cpu.er0 = cpu.er14
         cpu.er0 += 16
         cpu.call('fn_mcs_open')
@@ -149,6 +137,11 @@ def install(fw):
         cpu.mem8[cpu.offset(cpu.er14, CX)] = cpu.r0
         cpu.r0 = 15
         cpu.mem8[cpu.offset(cpu.er14, CY)] = cpu.r0
+        cpu.call('fn_graph_help')
+        cpu.compare(cpu.r0, 0xFA)
+        if cpu.eq:
+            cpu.jump('leave')
+        cpu.mem8[cpu.offset(cpu.er14, 374)] = cpu.r0
         cpu.label('redraw')
         cpu.call('fn_graph_release')
         cpu.call('fn_graph_prepare')
@@ -161,11 +154,25 @@ def install(fw):
         cpu.compare(cpu.r0, 0)
         if cpu.ne:
             cpu.branch('memory')
+        cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, 374)]
+        cpu.compare(cpu.r0, 2)
+        if cpu.eq:
+            cpu.jump('menu')
+        cpu.compare(cpu.r0, 0xFB)
+        if cpu.eq:
+            cpu.jump('edit')
         cpu.call('fn_graph_plot')
         cpu.call('fn_graph_record_replay')
         cpu.call(0x043BE)
+        cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, 374)]
+        cpu.r1 = 0
+        cpu.mem8[cpu.offset(cpu.er14, 374)] = cpu.r1
+        cpu.compare(cpu.r0, 0)
+        if cpu.ne:
+            cpu.jump('browse_key')
         cpu.label('browse')
         cpu.call(0x80800)
+        cpu.label('browse_key')
         cpu.compare(cpu.r0, 0xFA)
         if cpu.eq:
             cpu.branch('leave')
@@ -196,6 +203,8 @@ def install(fw):
             cpu.branch('redraw')
         cpu.branch('browse')
         cpu.label('edit')
+        cpu.r0 = 0
+        cpu.mem8[cpu.offset(cpu.er14, 374)] = cpu.r0
         cpu.call('fn_graph_formula_edit')
         cpu.compare(cpu.r0, 2)
         if cpu.ne:
@@ -204,27 +213,35 @@ def install(fw):
         cpu.label('edited')
         cpu.branch('redraw')
         cpu.label('menu')
+        cpu.r0 = 0
+        cpu.mem8[cpu.offset(cpu.er14, 374)] = cpu.r0
         cpu.call('fn_graph_menu')
-        cpu.compare(cpu.r0, 0x31)
-        if cpu.ne:
-            cpu.branch('skip_190')
-        cpu.call('fn_graph_trace')
-        cpu.label('skip_190')
-        cpu.compare(cpu.r0, 0x32)
-        if cpu.ne:
-            cpu.branch('skip_193')
-        cpu.call('fn_graph_calculate')
-        cpu.label('skip_193')
-        cpu.compare(cpu.r0, 0x33)
-        if cpu.ne:
-            cpu.branch('skip_196')
-        cpu.call('fn_graph_view_menu')
-        cpu.label('skip_196')
-        cpu.compare(cpu.r0, 0x34)
-        if cpu.ne:
-            cpu.branch('skip_199')
-        cpu.call('fn_graph_sketch')
-        cpu.label('skip_199')
+        cpu.compare(cpu.r0, 0)
+        if cpu.eq:
+            cpu.call('fn_graph_trace')
+            cpu.branch('redraw')
+        cpu.compare(cpu.r0, 1)
+        if cpu.eq:
+            cpu.call('fn_graph_calculate')
+            cpu.branch('redraw')
+        cpu.compare(cpu.r0, 2)
+        if cpu.eq:
+            cpu.call('fn_graph_view_menu')
+            cpu.branch('redraw')
+        cpu.compare(cpu.r0, 3)
+        if cpu.eq:
+            cpu.call('fn_graph_sketch')
+            cpu.branch('redraw')
+        cpu.compare(cpu.r0, 4)
+        if cpu.eq:
+            cpu.call('fn_graph_zoom_menu')
+            cpu.branch('redraw')
+        cpu.compare(cpu.r0, 5)
+        if cpu.eq:
+            cpu.call('fn_graph_help')
+            cpu.compare(cpu.r0, 0xFA)
+            if cpu.ne:
+                cpu.mem8[cpu.offset(cpu.er14, 374)] = cpu.r0
         cpu.branch('redraw')
         cpu.label('memory')
         cpu.call('fn_graph_error')
@@ -245,8 +262,20 @@ def install(fw):
         cpu.pop(cpu.pc)
 
     @fw.function(native=True)
-    def graph_names():
+    def graph_init():
         cpu.push(cpu.lr)
+        cpu.r0 = cpu.mem8[0x80A0]
+        cpu.mem8[cpu.offset(cpu.er14, FONT)] = cpu.r0
+        cpu.r0 = cpu.mem8[0x80A1]
+        cpu.mem8[cpu.offset(cpu.er14, FONT + 1)] = cpu.r0
+        cpu.r0 = cpu.mem8[0x80A2]
+        cpu.mem8[cpu.offset(cpu.er14, FONT + 2)] = cpu.r0
+        cpu.r0 = 7
+        cpu.mem8[0x80A0] = cpu.r0
+        cpu.r0 = 0
+        cpu.mem8[0x80A1] = cpu.r0
+        cpu.r0 = 1
+        cpu.mem8[0x80A2] = cpu.r0
         cpu.call('names')
         cpu.data(b'main\0E5GWORK\0E5GRAPH\0\0')
         cpu.label('names')
@@ -653,6 +682,11 @@ def install(fw):
         cpu.call('fn_graph_formula_get')
         cpu.compare(cpu.r0, 0)
         if cpu.ne:
+            cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, 374)]
+            cpu.compare(cpu.r0, 0xFB)
+            if cpu.eq:
+                cpu.r0 = 0
+                cpu.mem8[cpu.offset(cpu.er14, 374)] = cpu.r0
             cpu.call('fn_graph_formula_edit')
             cpu.compare(cpu.r0, 2)
             if cpu.ne:
@@ -1491,31 +1525,60 @@ def install(fw):
     @fw.function(native=True)
     def graph_menu():
         cpu.push(cpu.lr)
+        cpu.call('fn_ui_menu')
+        cpu.data(b'GRAPH\0TRACE\0CALC\0VIEW\0SKETCH\0ZOOM\0HELP / SAVE\0\0\0')
+        cpu.pop(cpu.pc)
+
+    @fw.function(native=True)
+    def graph_help():
+        cpu.push(cpu.lr)
         cpu.call('fn_graph_clear')
         cpu.r1 = 1
         cpu.call('fn_graph_text')
-        cpu.data(b'1:TRACE\0')
+        cpu.data(b'GRAPH EXE:EDIT\0\0')
         cpu.r1 = 9
         cpu.call('fn_graph_text')
-        cpu.data(b'2:CALC\0\0')
+        cpu.data(b'F:MENU ARROW:PAN\0\0')
         cpu.r1 = 17
         cpu.call('fn_graph_text')
-        cpu.data(b'3:VIEW\0\0')
+        cpu.data(b'EXIT:BACK\0')
         cpu.r1 = 25
         cpu.call('fn_graph_text')
-        cpu.data(b'4:SKETCH\0\0')
+        cpu.data(b'NATIVE OFF:SAVE\0')
         cpu.call(0x043BE)
         cpu.label('key')
         cpu.call(0x80800)
         cpu.compare(cpu.r0, 0xFA)
-        if cpu.eq:
+        if cpu.ge:
             cpu.branch('done')
-        cpu.compare(cpu.r0, 0x31)
-        if cpu.lt:
+        cpu.compare(cpu.r0, 2)
+        if cpu.ne:
             cpu.branch('key')
-        cpu.compare(cpu.r0, 0x34)
+        cpu.compare(cpu.r1, 0x7D)
+        if cpu.ne:
+            cpu.branch('key')
+        cpu.label('done')
+        cpu.pop(cpu.pc)
+
+
+    @fw.function(native=True)
+    def graph_zoom_menu():
+        cpu.push(cpu.lr)
+        cpu.call('fn_ui_menu')
+        cpu.data(b'ZOOM\0IN\0OUT\0RESET\0\0\0')
+        cpu.compare(cpu.r0, 2)
+        if cpu.eq:
+            cpu.call('fn_graph_window_reset')
+            cpu.branch('done')
+        cpu.compare(cpu.r0, 1)
         if cpu.gt:
-            cpu.branch('key')
+            cpu.branch('done')
+        cpu.compare(cpu.r0, 1)
+        if cpu.eq:
+            cpu.r0 = 0x32
+        else:
+            cpu.r0 = 0x38
+        cpu.call('fn_graph_pan_zoom')
         cpu.label('done')
         cpu.pop(cpu.pc)
 
@@ -1706,6 +1769,8 @@ def install(fw):
             cpu.branch('done')
         cpu.compare(cpu.r0, 0xFB)
         if cpu.eq:
+            cpu.r0 = 0
+            cpu.mem8[cpu.offset(cpu.er14, KIND)] = cpu.r0
             cpu.er0 = 4
             cpu.call('fn_graph_input_slot')
             cpu.compare(cpu.r0, 0)
@@ -1847,60 +1912,12 @@ def install(fw):
     @fw.function(native=True)
     def graph_calculate():
         cpu.push(cpu.lr)
-        cpu.r0 = 0
-        cpu.mem8[cpu.offset(cpu.er14, PAGE)] = cpu.r0
-        cpu.label('menu')
-        cpu.call('fn_graph_clear')
-        cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, PAGE)]
-        cpu.compare(cpu.r0, 0)
-        if cpu.eq:
-            cpu.r1 = 1
-            cpu.call('fn_graph_text')
-            cpu.data(b'1:ROOT 2:MIN\0\0')
-            cpu.r1 = 9
-            cpu.call('fn_graph_text')
-            cpu.data(b'3:MAX 4:SLOPE\0')
-            cpu.r1 = 25
-            cpu.call('fn_graph_text')
-            cpu.data(b'RIGHT:MORE\0\0')
-        else:
-            cpu.r1 = 1
-            cpu.call('fn_graph_text')
-            cpu.data(b'1:INTEGRAL\0\0')
-        cpu.call(0x043BE)
-        cpu.label('key')
-        cpu.call(0x80800)
-        cpu.compare(cpu.r0, 0xFA)
-        if cpu.eq:
-            cpu.jump('done')
-        cpu.compare(cpu.r0, 0xFC)
-        if cpu.ne:
-            cpu.branch('skip_1757')
-        cpu.r0 = 0
-        cpu.mem8[cpu.offset(cpu.er14, PAGE)] = cpu.r0
-        cpu.branch('menu')
-        cpu.label('skip_1757')
-        cpu.compare(cpu.r0, 0xFD)
-        if cpu.ne:
-            cpu.branch('skip_1762')
-        cpu.r0 = 1
-        cpu.mem8[cpu.offset(cpu.er14, PAGE)] = cpu.r0
-        cpu.branch('menu')
-        cpu.label('skip_1762')
-        cpu.compare(cpu.r0, 0x31)
-        if cpu.lt:
-            cpu.branch('key')
-        cpu.compare(cpu.r0, 0x34)
+        cpu.call('fn_ui_menu')
+        cpu.data(b'CALC\0ROOT\0MIN\0MAX\0SLOPE\0INTEGRAL\0\0')
+        cpu.compare(cpu.r0, 4)
         if cpu.gt:
-            cpu.branch('key')
-        cpu.r0 += 208
-        cpu.r1 = cpu.mem8[cpu.offset(cpu.er14, PAGE)]
-        cpu.compare(cpu.r1, 0)
-        if cpu.ne:
-            cpu.compare(cpu.r0, 1)
-            if cpu.ne:
-                cpu.branch('key')
-            cpu.r0 = 5
+            cpu.jump('done')
+        cpu.r0 += 1
         cpu.mem8[cpu.offset(cpu.er14, KIND)] = cpu.r0
         cpu.call('fn_graph_prepare')
         cpu.compare(cpu.r0, 0)
@@ -1961,6 +1978,9 @@ def install(fw):
         cpu.call('fn_graph_values')
         cpu.call('fn_graph_result_flags')
         cpu.call('fn_graph_wait')
+        cpu.compare(cpu.r0, 0xFA)
+        if cpu.eq:
+            cpu.branch('done')
         cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, 153)]
         cpu.compare(cpu.r0, 0)
         if cpu.ne:
@@ -2001,6 +2021,7 @@ def install(fw):
         cpu.r6 = 0
         cpu.r3 = 20
         cpu.call('fn_graph_copy')
+        cpu.call('fn_graph_input_hint')
         cpu.er0 = cpu.er14
         cpu.r0 += 64
         cpu.add_carry(cpu.r1, 1)
@@ -2041,62 +2062,69 @@ def install(fw):
         cpu.pop(cpu.pc)
 
     @fw.function(native=True)
+    def graph_input_hint():
+        cpu.push(cpu.lr)
+        cpu.r4 = cpu.mem8[cpu.offset(cpu.er14, KIND)]
+        cpu.r5 = 9
+        cpu.multiply(cpu.er4, cpu.r5)
+        cpu.call('tasks')
+        cpu.data(b'TRACE    ROOT     MIN      MAX      SLOPE    INTEGRAL VIEW     \0')
+        cpu.label('tasks')
+        cpu.push(cpu.lr)
+        cpu.pop(cpu.xr0)
+        cpu.er0 += cpu.er4
+        cpu.er4 = cpu.er14
+        cpu.r4 += 0
+        cpu.add_carry(cpu.r5, 1)
+        cpu.r6 = 0
+        cpu.r3 = 9
+        cpu.call('fn_graph_copy')
+        cpu.er0 = cpu.mem16[cpu.offset(cpu.er14, 244)]
+        cpu.compare(cpu.r0, 192)
+        if cpu.ge:
+            cpu.r0 += 84
+        else:
+            cpu.compare(cpu.r0, 44)
+            if cpu.lt:
+                cpu.er0 = 24
+            cpu.er0 += -24
+        cpu.r2 = 20
+        cpu.divide(cpu.er0, cpu.r2)
+        cpu.r1 = 6
+        cpu.multiply(cpu.er0, cpu.r1)
+        cpu.er12 = cpu.er0
+        cpu.call('params')
+        cpu.data(b'X\0\0\0\0\0X MIN\0X MAX\0Y MIN\0Y MAX\0')
+        cpu.label('params')
+        cpu.push(cpu.lr)
+        cpu.pop(cpu.xr0)
+        cpu.er0 += cpu.er12
+        cpu.er4 += 9
+        cpu.r6 = 0
+        cpu.r3 = 6
+        cpu.call('fn_graph_copy')
+        cpu.er4 += -9
+        cpu.pop(cpu.pc)
+
+    @fw.function(native=True)
     def graph_view_menu():
         cpu.push(cpu.lr)
         cpu.label('menu')
-        cpu.call('fn_graph_clear')
-        cpu.r1 = 1
-        cpu.call('fn_graph_text')
-        cpu.data(b'1:XMIN 2:XMAX\0')
-        cpu.r1 = 9
-        cpu.call('fn_graph_text')
-        cpu.data(b'3:YMIN 4:YMAX\0')
-        cpu.r1 = 25
-        cpu.call('fn_graph_text')
-        cpu.data(b'RIGHT:RESET\0')
-        cpu.call(0x043BE)
-        cpu.label('key')
-        cpu.call(0x80800)
-        cpu.compare(cpu.r0, 0xFA)
+        cpu.call('fn_ui_menu')
+        cpu.data(b'VIEW\0XMIN\0XMAX\0YMIN\0YMAX\0RESET\0\0')
+        cpu.compare(cpu.r0, 4)
         if cpu.eq:
+            cpu.call('fn_graph_window_reset')
             cpu.branch('done')
-        cpu.compare(cpu.r0, 0xFD)
-        if cpu.eq:
-            cpu.call('fn_graph_clear')
-            cpu.r1 = 1
-            cpu.call('fn_graph_text')
-            cpu.data(b'1:RESET\0')
-            cpu.call(0x043BE)
-            cpu.call(0x80800)
-            cpu.compare(cpu.r0, 0x31)
-            if cpu.ne:
-                cpu.branch('menu')
-            cpu.call('reset')
-            cpu.data(INITIAL)
-            cpu.label('reset')
-            cpu.push(cpu.lr)
-            cpu.pop(cpu.xr0)
-            cpu.r0 += 6
-            cpu.add_carry(cpu.r1, 0)
-            cpu.er4 = cpu.er14
-            cpu.er4 += HEADER + 6
-            cpu.r6 = 0
-            cpu.r3 = 80
-            cpu.call('fn_graph_copy')
-            cpu.call('fn_graph_save')
-            cpu.branch('done')
-        cpu.compare(cpu.r0, 0x31)
-        if cpu.lt:
-            cpu.branch('key')
-        cpu.compare(cpu.r0, 0x34)
         if cpu.gt:
-            cpu.branch('key')
-        cpu.r0 += 207
+            cpu.branch('done')
         cpu.r1 = 20
         cpu.multiply(cpu.er0, cpu.r1)
         cpu.r0 += 192
         cpu.add_carry(cpu.r1, 0)
         cpu.mem16[cpu.offset(cpu.er14, POS)] = cpu.er0
+        cpu.r2 = 6
+        cpu.mem8[cpu.offset(cpu.er14, KIND)] = cpu.r2
         cpu.call('fn_graph_input_slot')
         cpu.compare(cpu.r0, 0)
         if cpu.eq:
@@ -2116,6 +2144,23 @@ def install(fw):
         cpu.jump('menu')
         cpu.label('done')
         cpu.r0 = 0
+        cpu.pop(cpu.pc)
+
+    @fw.function(native=True)
+    def graph_window_reset():
+        cpu.push(cpu.lr)
+        cpu.call('reset')
+        cpu.data(INITIAL)
+        cpu.label('reset')
+        cpu.push(cpu.lr)
+        cpu.pop(cpu.xr0)
+        cpu.er0 += 6
+        cpu.er4 = cpu.er14
+        cpu.er4 += HEADER + 6
+        cpu.r6 = 0
+        cpu.r3 = 80
+        cpu.call('fn_graph_copy')
+        cpu.call('fn_graph_save')
         cpu.pop(cpu.pc)
 
     @fw.function(native=True)
@@ -2348,7 +2393,9 @@ def install(fw):
             cpu.branch('numbers')
         cpu.compare(cpu.r0, 5)
         if cpu.ne:
-            cpu.branch('bad')
+            cpu.compare(cpu.r0, 6)
+            if cpu.ne:
+                cpu.branch('bad')
         cpu.er0 = cpu.mem16[cpu.offset(cpu.er14, SIZE)]
         cpu.compare(cpu.r0, 45)
         cpu.compare_carry(cpu.r1, 0)
@@ -2482,7 +2529,7 @@ def install(fw):
         cpu.mem16[cpu.offset(cpu.er14, SIZE)] = cpu.er4
         cpu.er12 = 3
         cpu.compare(cpu.r3, 5)
-        if cpu.ne:
+        if cpu.lt:
             cpu.branch('skip_2335')
         cpu.er12 = 5
         cpu.label('skip_2335')
@@ -2495,7 +2542,7 @@ def install(fw):
         if cpu.eq:
             cpu.branch('text')
         cpu.compare(cpu.r0, 5)
-        if cpu.eq:
+        if cpu.ge:
             cpu.branch('stroke')
         cpu.er0 = P
         cpu.er4 = DX
@@ -2560,6 +2607,8 @@ def install(fw):
         cpu.call(0x041DA)
         cpu.branch('next')
         cpu.label('stroke')
+        cpu.r0 = 0
+        cpu.mem8[cpu.offset(cpu.er14, 248)] = cpu.r0
         cpu.call('fn_graph_record_address')
         cpu.er4 = cpu.er0
         cpu.r0 = cpu.mem8[cpu.r2, cpu.offset(cpu.er4, 3)]
@@ -2587,7 +2636,7 @@ def install(fw):
         cpu.er12 += 40
         cpu.push(cpu.er12)
         cpu.call('fn_graph_record_point')
-        cpu.call('fn_graph_line')
+        cpu.call('fn_graph_pen_segment')
         cpu.pop(cpu.er12)
         cpu.er0 = cpu.mem16[cpu.offset(cpu.er14, 246)]
         cpu.er0 += -1
@@ -2689,78 +2738,30 @@ def install(fw):
     @fw.function(native=True)
     def graph_sketch():
         cpu.push(cpu.lr)
-        cpu.r0 = 0
-        cpu.mem8[cpu.offset(cpu.er14, PAGE)] = cpu.r0
-        cpu.label('menu')
-        cpu.call('fn_graph_clear')
-        cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, PAGE)]
-        cpu.compare(cpu.r0, 0)
-        if cpu.eq:
-            cpu.r1 = 1
-            cpu.call('fn_graph_text')
-            cpu.data(b'1:POINT 2:LINE\0\0')
-            cpu.r1 = 9
-            cpu.call('fn_graph_text')
-            cpu.data(b'3:RECT 4:TEXT\0')
-            cpu.r1 = 25
-            cpu.call('fn_graph_text')
-            cpu.data(b'RIGHT:MORE\0\0')
-        else:
-            cpu.r1 = 1
-            cpu.call('fn_graph_text')
-            cpu.data(b'1:PEN 2:UNDO\0\0')
-            cpu.r1 = 9
-            cpu.call('fn_graph_text')
-            cpu.data(b'3:CLEAR\0')
-        cpu.call(0x043BE)
-        cpu.label('key')
-        cpu.call(0x80800)
-        cpu.compare(cpu.r0, 0xFA)
-        if cpu.eq:
-            cpu.jump('done')
-        cpu.compare(cpu.r0, 0xFC)
-        if cpu.ne:
-            cpu.branch('skip_2562')
-        cpu.r0 = 0
-        cpu.mem8[cpu.offset(cpu.er14, PAGE)] = cpu.r0
-        cpu.branch('menu')
-        cpu.label('skip_2562')
-        cpu.compare(cpu.r0, 0xFD)
-        if cpu.ne:
-            cpu.branch('skip_2567')
-        cpu.r0 = 1
-        cpu.mem8[cpu.offset(cpu.er14, PAGE)] = cpu.r0
-        cpu.branch('menu')
-        cpu.label('skip_2567')
-        cpu.compare(cpu.r0, 0x31)
-        if cpu.lt:
-            cpu.branch('key')
-        cpu.compare(cpu.r0, 0x34)
+        cpu.call('fn_ui_menu')
+        cpu.data(b'SKETCH\0POINT\0LINE\0RECT\0TEXT\0PEN\0UNDO\0CLEAR\0\0')
+        cpu.compare(cpu.r0, 6)
         if cpu.gt:
-            cpu.branch('key')
-        cpu.r0 += 208
-        cpu.r1 = cpu.mem8[cpu.offset(cpu.er14, PAGE)]
-        cpu.compare(cpu.r1, 0)
-        if cpu.ne:
-            cpu.compare(cpu.r0, 1)
-            if cpu.eq:
-                cpu.r0 = 5
-            else:
-                cpu.compare(cpu.r0, 2)
-                if cpu.ne:
-                    cpu.branch('skip_2586')
-                cpu.call('fn_graph_undo')
-                cpu.jump('done')
-                cpu.label('skip_2586')
-                cpu.compare(cpu.r0, 3)
-                if cpu.ne:
-                    cpu.branch('skip_2590')
-                cpu.call('fn_graph_clear_sketch')
-                cpu.jump('done')
-                cpu.label('skip_2590')
-                cpu.branch('key')
+            cpu.jump('done')
+        cpu.compare(cpu.r0, 5)
+        if cpu.eq:
+            cpu.call('fn_graph_undo')
+            cpu.jump('done')
+        cpu.compare(cpu.r0, 6)
+        if cpu.eq:
+            cpu.call('fn_graph_clear_sketch')
+            cpu.jump('done')
+        cpu.r0 += 1
         cpu.mem8[cpu.offset(cpu.er14, KIND)] = cpu.r0
         cpu.push(cpu.er0)
+        cpu.compare(cpu.r0, 5)
+        if cpu.eq:
+            cpu.call('fn_graph_pen_help')
+            cpu.compare(cpu.r0, 0xFA)
+            if cpu.eq:
+                cpu.pop(cpu.er0)
+                cpu.jump('done')
+            cpu.mem8[cpu.offset(cpu.er14, 374)] = cpu.r0
         cpu.call('fn_graph_plot')
         cpu.call('fn_graph_record_replay')
         cpu.pop(cpu.er0)
@@ -2781,6 +2782,9 @@ def install(fw):
             cpu.mem16[cpu.offset(cpu.er14, COUNT)] = cpu.er0
             cpu.r0 = 0
             cpu.mem8[cpu.offset(cpu.er14, MODE)] = cpu.r0
+            # Kind 6 stores duplicate endpoints as pen-up markers.
+            cpu.r0 = 6
+            cpu.mem8[cpu.r10, cpu.er4] = cpu.r0
             cpu.branch('pen')
         cpu.call('fn_graph_pick')
         cpu.compare(cpu.r0, 0)
@@ -2803,7 +2807,7 @@ def install(fw):
             cpu.call('fn_graph_text_input')
             cpu.compare(cpu.r0, 0)
             if cpu.eq:
-                cpu.branch('done')
+                cpu.jump('done')
             cpu.r1 = 0
             cpu.push(cpu.er0)
             cpu.call('fn_graph_work')
@@ -2837,44 +2841,90 @@ def install(fw):
             cpu.pop(cpu.er0)
             cpu.er0 += 43
             cpu.mem16[cpu.offset(cpu.er14, SIZE)] = cpu.er0
-        cpu.branch('commit')
+        cpu.jump('commit')
         cpu.label('text_bad')
         cpu.pop(cpu.er0)
-        cpu.branch('done')
+        cpu.jump('done')
         cpu.label('second')
         cpu.call('fn_graph_pick')
         cpu.compare(cpu.r0, 0)
         if cpu.eq:
-            cpu.branch('done')
+            cpu.jump('done')
         cpu.call('fn_graph_stage_point')
-        cpu.branch('commit')
+        cpu.jump('commit')
         cpu.label('pen')
         cpu.call('fn_graph_cursor')
         cpu.call(0x043BE)
-        cpu.call(0x80800)
+        cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, 374)]
+        cpu.r2 = 0
+        cpu.mem8[cpu.offset(cpu.er14, 374)] = cpu.r2
+        cpu.r1 = 0x7D
+        cpu.compare(cpu.r0, 0)
+        if cpu.eq:
+            cpu.call(0x80800)
         cpu.push(cpu.er0)
         cpu.call('fn_graph_cursor')
         cpu.pop(cpu.er0)
         cpu.compare(cpu.r0, 0xFA)
         if cpu.eq:
-            cpu.branch('pen_end')
+            cpu.jump('done')
+        cpu.compare(cpu.r0, 2)
+        if cpu.eq:
+            cpu.compare(cpu.r1, 0x7D)
+            if cpu.eq:
+                cpu.call('fn_graph_pen_menu')
+                cpu.compare(cpu.r0, 0)
+                if cpu.eq:
+                    cpu.branch('pen_end')
+                cpu.compare(cpu.r0, 1)
+                if cpu.eq:
+                    cpu.call('fn_graph_undo')
+                    cpu.jump('done')
+                cpu.branch('pen')
         cpu.compare(cpu.r0, 0xFB)
         if cpu.eq:
             cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, MODE)]
-            cpu.r0 ^= 1
-            cpu.mem8[cpu.offset(cpu.er14, MODE)] = cpu.r0
-            cpu.compare(cpu.r0, 0)
-            if cpu.eq:
-                cpu.call('fn_graph_pen_commit')
-                cpu.compare(cpu.r0, 0)
-                if cpu.ne:
-                    cpu.branch('full')
-                cpu.branch('pen')
-            cpu.call('fn_graph_stage_point')
             cpu.compare(cpu.r0, 0)
             if cpu.ne:
-                cpu.branch('full')
+                cpu.r0 = 0
+                cpu.mem8[cpu.offset(cpu.er14, MODE)] = cpu.r0
+                cpu.er0 = cpu.mem16[cpu.offset(cpu.er14, CX)]
+                cpu.mem16[cpu.offset(cpu.er14, PREV)] = cpu.er0
+                cpu.branch('pen_stage')
+            cpu.er0 = cpu.mem16[cpu.offset(cpu.er14, COUNT)]
+            cpu.er0 = cpu.er0
+            if cpu.eq:
+                cpu.branch('pen_start')
+            cpu.er0 = cpu.mem16[cpu.offset(cpu.er14, CX)]
+            cpu.er2 = cpu.mem16[cpu.offset(cpu.er14, PREV)]
+            cpu.compare(cpu.er0, cpu.er2)
+            if cpu.ne:
+                cpu.branch('pen_start')
+            cpu.er0 = cpu.mem16[cpu.offset(cpu.er14, SIZE)]
+            cpu.er0 += -40
+            cpu.mem16[cpu.offset(cpu.er14, SIZE)] = cpu.er0
+            cpu.er0 = cpu.mem16[cpu.offset(cpu.er14, COUNT)]
+            cpu.er0 += -1
+            cpu.mem16[cpu.offset(cpu.er14, COUNT)] = cpu.er0
+            cpu.r0 = 1
+            cpu.mem8[cpu.offset(cpu.er14, MODE)] = cpu.r0
             cpu.branch('pen')
+        cpu.branch('pen_move')
+        cpu.label('pen_start')
+        cpu.r0 = 2
+        cpu.mem8[cpu.offset(cpu.er14, MODE)] = cpu.r0
+        cpu.label('pen_stage')
+        cpu.call('fn_graph_stage_point')
+        cpu.compare(cpu.r0, 0)
+        if cpu.ne:
+            cpu.branch('full')
+        cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, MODE)]
+        cpu.compare(cpu.r0, 2)
+        if cpu.eq:
+            cpu.r0 = 1
+            cpu.mem8[cpu.offset(cpu.er14, MODE)] = cpu.r0
+        cpu.branch('pen')
+        cpu.label('pen_move')
         cpu.er2 = cpu.mem16[cpu.offset(cpu.er14, CX)]
         cpu.push(cpu.er2)
         cpu.call('fn_graph_cursor_key')
@@ -3403,11 +3453,14 @@ def install(fw):
         cpu.r0 = cpu.mem8[cpu.r10, cpu.offset(cpu.er8, 84)]
         cpu.mem8[cpu.offset(cpu.er14, 151)] = cpu.r0
         cpu.r0 &= 1
-        if cpu.eq:
-            cpu.branch('skip_3221')
-        cpu.r1 = 1
-        cpu.call('fn_graph_text')
-        cpu.data(b'ENDPOINT\0\0')
+        if cpu.ne:
+            cpu.r1 = 1
+            cpu.call('fn_graph_text')
+            cpu.data(b'END EXE/EXIT\0\0')
+        else:
+            cpu.r1 = 1
+            cpu.call('fn_graph_text')
+            cpu.data(b'EXE:GO EXIT:BACK\0\0')
         cpu.label('skip_3221')
         cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, 151)]
         cpu.r0 &= 2
@@ -3453,14 +3506,142 @@ def install(fw):
         cpu.pop(cpu.pc)
 
     @fw.function(native=True)
+    def graph_pen_help():
+        cpu.push(cpu.lr)
+        cpu.call('fn_graph_clear')
+        cpu.r1 = 1
+        cpu.call('fn_graph_text')
+        cpu.data(b'PEN EXE:UP/DOWN\0')
+        cpu.r1 = 9
+        cpu.call('fn_graph_text')
+        cpu.data(b'F:MENU DONE/UNDO\0\0')
+        cpu.r1 = 17
+        cpu.call('fn_graph_text')
+        cpu.data(b'EXIT:CANCEL PEN\0')
+        cpu.r1 = 25
+        cpu.call('fn_graph_text')
+        cpu.data(b'OFF:SAVE FLASH\0\0')
+        cpu.call(0x043BE)
+        cpu.jump('fn_graph_help__key')
+
+    @fw.function(native=True)
+    def graph_pen_menu():
+        cpu.push(cpu.lr)
+        cpu.sp += -128
+        cpu.sp += -128
+        cpu.sp += -128
+        cpu.er4 = cpu.sp
+        cpu.er6 = 0x80EC
+        cpu.er12 = 186
+        cpu.label('save')
+        cpu.er0 = cpu.mem16[0, cpu.er6]
+        cpu.mem16[0, cpu.er4] = cpu.er0
+        cpu.er4 += 2
+        cpu.er6 += 2
+        cpu.er12 += -1
+        if cpu.ne:
+            cpu.branch('save')
+        cpu.label('choose')
+        cpu.er0 = cpu.mem16[cpu.offset(cpu.er14, COUNT)]
+        cpu.er0 = cpu.er0
+        if cpu.eq:
+            cpu.call('fn_ui_menu')
+            cpu.data(b'PEN\0UNDO\0HELP\0\0\0')
+            cpu.compare(cpu.r0, 0)
+            if cpu.eq:
+                cpu.er0 = 1
+                cpu.branch('restore')
+            cpu.compare(cpu.r0, 1)
+            if cpu.eq:
+                cpu.branch('help')
+        else:
+            cpu.call('fn_ui_menu')
+            cpu.data(b'PEN\0DONE\0UNDO\0HELP\0\0')
+            cpu.compare(cpu.r0, 2)
+            if cpu.lt:
+                cpu.branch('restore')
+            if cpu.eq:
+                cpu.branch('help')
+        cpu.er0 = 0xFFFF
+        cpu.branch('restore')
+        cpu.label('help')
+        cpu.call('fn_graph_pen_help')
+        cpu.compare(cpu.r0, 0xFA)
+        if cpu.eq:
+            cpu.branch('choose')
+        cpu.compare(cpu.r0, 2)
+        if cpu.eq:
+            cpu.branch('choose')
+        cpu.mem8[cpu.offset(cpu.er14, 374)] = cpu.r0
+        cpu.er0 = 0xFFFF
+        cpu.label('restore')
+        cpu.er4 = cpu.sp
+        cpu.er6 = 0x80EC
+        cpu.er12 = 186
+        cpu.label('copy')
+        cpu.er2 = cpu.mem16[0, cpu.er4]
+        cpu.mem16[0, cpu.er6] = cpu.er2
+        cpu.er4 += 2
+        cpu.er6 += 2
+        cpu.er12 += -1
+        if cpu.ne:
+            cpu.branch('copy')
+        cpu.sp += 127
+        cpu.sp += 127
+        cpu.sp += 127
+        cpu.sp += 3
+        cpu.pop(cpu.pc)
+
+    @fw.function(native=True)
+    def graph_pen_segment():
+        cpu.push(cpu.lr)
+        cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, KIND)]
+        cpu.compare(cpu.r0, 5)
+        if cpu.eq:
+            cpu.branch('line')
+        cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, 248)]
+        cpu.compare(cpu.r0, 0)
+        if cpu.ne:
+            cpu.r0 = 0
+            cpu.mem8[cpu.offset(cpu.er14, 248)] = cpu.r0
+            cpu.branch('point')
+        cpu.er4 = P
+        cpu.er6 = DX
+        cpu.call('fn_graph_cmp')
+        cpu.compare(cpu.r0, 1)
+        if cpu.ne:
+            cpu.branch('line')
+        cpu.er4 = Q
+        cpu.er6 = DY
+        cpu.call('fn_graph_cmp')
+        cpu.compare(cpu.r0, 1)
+        if cpu.ne:
+            cpu.branch('line')
+        cpu.r0 = 1
+        cpu.mem8[cpu.offset(cpu.er14, 248)] = cpu.r0
+        cpu.label('point')
+        cpu.call('fn_graph_point_pixel')
+        cpu.r2 = 1
+        cpu.call('fn_graph_pixel')
+        cpu.pop(cpu.pc)
+        cpu.label('line')
+        cpu.call('fn_graph_line')
+        cpu.pop(cpu.pc)
+
+    @fw.function(native=True)
     def graph_pen_preview():
         cpu.push(cpu.lr)
+        cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, MODE)]
+        cpu.compare(cpu.r0, 2)
+        if cpu.eq:
+            cpu.branch('point')
         cpu.call('fn_graph_slots')
         cpu.er0 = cpu.mem16[cpu.offset(cpu.er14, COUNT)]
         cpu.compare(cpu.r0, 1)
         cpu.compare_carry(cpu.r1, 0)
         if cpu.ne:
             cpu.branch('skip_3273')
+        cpu.label('point')
         cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, CX)]
         cpu.r1 = cpu.mem8[cpu.offset(cpu.er14, CY)]
         cpu.r2 = 1
@@ -3554,7 +3735,7 @@ def install(fw):
         cpu.er4 = cpu.er8
         cpu.r4 += (-3072) & 255
         cpu.add_carry(cpu.r5, ((-3072) >> 8) & 255)
-        cpu.r0 = 5
+        cpu.r0 = 6
         cpu.mem8[cpu.r10, cpu.er4] = cpu.r0
         cpu.r0 = 0
         cpu.pop(cpu.pc)

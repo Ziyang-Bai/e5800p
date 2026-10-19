@@ -2,7 +2,7 @@
 
 CASIO fx-5800P 修改固件。
 
-提供 GRAPH 绘图与数值分析、原生 TABLE、ASM/Hex 编辑器及 e.basic 扩展命令。随附的 5800p-kits 将 [PL/e](docs/5800p-kits.md#ple) 源码编译为固件补丁和 `.bin` 应用。
+提供 GRAPH 绘图与数值分析、原生 TABLE、ASM/Hex 编辑器及 e.basic 的矩阵、字符串、内存和图形命令。随附的 5800p-kits 将 [PL/e](docs/5800p-kits.md#ple) 源码编译为固件补丁和 `.bin` 应用。
 
 ## 从原厂 Flash 构建
 

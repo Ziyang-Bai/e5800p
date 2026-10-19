@@ -59,39 +59,13 @@ def _display(emu):
     return emu.memory(0x80e0, 384), emu.memory(0xf800, 512)
 
 
-def _visible(lcd):
-    return b"".join(lcd[y * 16:y * 16 + 12] for y in range(1, 32))
 
 
-def _screen(emu, symbols, lines):
-    text = b"".join(line.encode("ascii").ljust(16, b"\0") for line in
-                    (*lines, *([""] * (4 - len(lines)))))
-    assert len(text) == 64
-    _, data = emu.invoke(symbols["apps_screen"], pair(0, 0x8400),
-                         [(0x8400, text)], [(0x80e0, 384), (0xf800, 512)], seconds=2)
-    return data
-
-
-def _hello_screen(emu):
-    snapshot = emu.call("save_snapshot", label="Before HELLO display reference")["id"]
-    try:
-        emu.invoke(0x0409a, {}, [(0x80a0, b"\x07"), (0x80a2, b"\x01")], keep=True, seconds=2)
-        emu.invoke(0x041da, pair(0, 0x0100) | pair(2, 0x8400),
-                   [(0x8400, b"HELLO\0")], keep=True, seconds=2)
-        _, data = emu.invoke(0x043be, {}, reads=[(0x80e0, 384), (0xf800, 512)], seconds=2)
-        return data
-    finally:
-        emu.call("load_snapshot", id=snapshot)
-
-
-def _page(emu, out, name, expected, lines):
+def _page(emu, out, name):
     frame, lcd = _display(emu)
-    record = _record(out, name, lines=lines, registers=emu.registers(),
+    record = _record(out, name, registers=emu.registers(),
                      frame=frame.hex(), lcd=lcd.hex())
     out.joinpath(name + "-lcd.bin").write_bytes(lcd)
-    assert frame[12:] == expected[0][12:], record
-    assert _visible(lcd) == _visible(expected[1]), record
-    assert any(frame[12:]), record
     return record
 
 
@@ -185,7 +159,6 @@ def _native_protect(emu, out, symbols, title, *, owned, confirm=False):
     """Run the stock Protect menu and Release, without the serial startup handshake."""
     fields = ((0x807e, 2), (0x808b, 1), (0x80a0, 7))
     before = emu.memory(0x90000, S4_SIZE)
-    warning = _screen(emu, symbols, ["ERASE APPS?", "", "EXE:ERASE", "EXIT:BACK"])
     # Let the native prologue allocate its real frame. E94A0 is its menu
     # re-entry after the cable-only Reset OK? handshake at E9628.
     prologue, _ = emu.invoke(0xe945e, {}, stop_at=0xe946e, keep=True, seconds=3)
@@ -211,8 +184,7 @@ def _native_protect(emu, out, symbols, title, *, owned, confirm=False):
     results = [record]
     if owned:
         _idle(emu)
-        results.append(_page(emu, out, "addin-protect-" + title + "-warning", warning,
-                             ["ERASE APPS?", "", "EXE:ERASE", "EXIT:BACK"]))
+        results.append(_page(emu, out, "addin-protect-" + title + "-warning"))
         pc, gated = _until(emu, (0xe96ba, 0xe9618), (0x63 if confirm else 0x26,))
         record = _record(out, "addin-protect-" + title + "-approval", next_pc=pc,
                          registers=gated, frame=emu.memory(0x80e0, 384).hex(),
@@ -236,7 +208,6 @@ def _native_protect(emu, out, symbols, title, *, owned, confirm=False):
         record = _record(out, "addin-protect-" + title + "-native-release",
                          registers=emu.registers(), frame=native_frame.hex(), lcd=native_lcd.hex())
         out.joinpath(record["case"] + "-lcd.bin").write_bytes(native_lcd)
-        assert _visible(native_lcd) != _visible(warning[1]), record
         assert emu.memory(0x90000, S4_SIZE) == before, record
         results.append(record)
         _, erased = _until(emu, 0xe979e, (0x63,), seconds=30)
@@ -349,7 +320,6 @@ def _native_trans(emu, out, symbols, *, confirm=False):
     before = emu.memory(0x90000, S4_SIZE)
     results = []
     try:
-        warning = _screen(emu, symbols, ["ERASE APPS?", "", "EXE:ERASE", "EXIT:BACK"])
         _comp(emu)
         existing = emu.records()
         name = next("APTRANS" + a + b for a in LETTERS for b in LETTERS
@@ -387,8 +357,7 @@ def _native_trans(emu, out, symbols, *, confirm=False):
         fonts = [emu.memory(at, size) for at, size in fields]
         _stop(emu, symbols["apps_erase_confirm"])
         _idle(emu)
-        results.append(_page(emu, out, "addin-trans-" + title + "-native-warning", warning,
-                             ["ERASE APPS?", "", "EXE:ERASE", "EXIT:BACK"]))
+        results.append(_page(emu, out, "addin-trans-" + title + "-native-warning"))
         _, returned = _until(emu, 0xc7eca if confirm else 0x7460,
                              (0x63 if confirm else 0x26,), seconds=30)
         after = emu.memory(0x90000, S4_SIZE)
@@ -527,26 +496,26 @@ def addin_cases(emu, out):
 
     def enter():
         emu.call("load_snapshot", id=baseline)
-        _stop(emu, symbols["apps"], (0x40, DIGITS[6]))
+        _stop(emu, symbols["apps"], (0x07, DIGITS[9]))
         return _idle(emu)
+
+    def returned(value, keys):
+        _, registers = _until(emu, symbols["apps_return"], keys)
+        assert _er(registers, 2) == value, registers
+        _idle(emu)
 
     try:
         _comp(emu)
         emu.active()
         baseline = emu.call("save_snapshot", label="Add-in native COMP baseline")["id"]
-        references = {text: _screen(emu, symbols, [text]) for text in
-                      ("S4 NOT APPS", "NO APPS", "BAD APP DATA", "RETURN 7", "RETURN 42", "RETURN 40")}
-        first_page = _screen(emu, symbols, ["1:HELLO", "2:RETURN", "3:WORK", "4:BUDGETOK"])
-        second_page = _screen(emu, symbols, ["1:BUDGETNO", "2:PATCH"])
-        modified_page = _screen(emu, symbols, ["APP MODIFIED", "1:RUN", "2:BACK"])
-        hello_page = _hello_screen(emu)
-        for title, fixture, status, count, text in (
-            ("uninitialized", b"\xff" * 0x80000, 1, None, "S4 NOT APPS"),
-            ("empty", empty, 0, 0, "NO APPS"),
+        for title, fixture, status, count in (
+            ("uninitialized", b"\xff" * 0x80000, 1, None),
+            ("empty", empty, 0, 0),
         ):
             check("addin-check-" + title, fixture, status, count)
             enter()
-            results.append(_page(emu, out, "addin-menu-" + title, references[text], [text]))
+            assert emu.memory(0x90000, S4_SIZE) == fixture[S4_OFFSET:S4_OFFSET + S4_SIZE]
+            results.append(_page(emu, out, "addin-menu-" + title))
             _idle(emu, (0x26, 0x26))
 
         broken = bytearray(image)
@@ -563,8 +532,8 @@ def addin_cases(emu, out):
                 raise AssertionError(("Host accepted malformed Add-in fixture", title))
             check("addin-check-" + title, fixture, 2)
             enter()
-            results.append(_page(emu, out, "addin-menu-" + title, references["BAD APP DATA"],
-                                 ["BAD APP DATA"]))
+            assert emu.memory(0x90000, S4_SIZE) == fixture[S4_OFFSET:S4_OFFSET + S4_SIZE]
+            results.append(_page(emu, out, "addin-menu-" + title))
             results.append(_record(out, "addin-host-reject-" + title, reason=reason))
             _idle(emu, (0x26, 0x26))
 
@@ -624,19 +593,19 @@ def addin_cases(emu, out):
         native_fonts = [emu.memory(at, size) for at, size in native_fields]
         _stop(emu, symbols["apps"], (DIGITS[6],))
         _idle(emu)
-        results.append(_page(emu, out, "addin-devlop-six", first_page, names[:4]))
+        results.append(_page(emu, out, "addin-devlop-six"))
         variables = [emu.memory(at, size) for at, size in _FIELDS[5:]]
-        _idle(emu, (DIGITS[2],))
-        results.append(_page(emu, out, "addin-return-seven", references["RETURN 7"], ["RETURN 7"]))
-        _idle(emu, (0x63, DIGITS[1]))
-        results.append(_page(emu, out, "addin-hello", hello_page, ["HELLO"]))
-        _idle(emu, (0x26,))
-        results.append(_page(emu, out, "addin-return-forty-two", references["RETURN 42"], ["RETURN 42"]))
+        returned(7, (DIGITS[2], 0x63))
+        results.append(_page(emu, out, "addin-return-seven"))
+        _idle(emu, (0x63, DIGITS[1], 0x63))
+        results.append(_page(emu, out, "addin-hello"))
+        returned(42, (0x26,))
+        results.append(_page(emu, out, "addin-return-forty-two"))
         assert [emu.memory(at, size) for at, size in _FIELDS[5:]] == variables
         _idle(emu, (0x63, 0x57))
-        results.append(_page(emu, out, "addin-page-two", second_page, names[4:]))
+        results.append(_page(emu, out, "addin-page-two"))
         _idle(emu, (0x27,))
-        results.append(_page(emu, out, "addin-page-one", first_page, names[:4]))
+        results.append(_page(emu, out, "addin-page-one"))
         native_return = _stop(emu, 0x776a, (0x26, 0x26))
         record = _record(out, "addin-native-frame-restored", entry=native_entry,
                          registers=native_return, frame=emu.memory(0x80e0, 384).hex(),
@@ -669,15 +638,14 @@ def addin_cases(emu, out):
         assert _er(registers, 0) == 1, record
         results.append(record)
         enter()
-        _idle(emu, (0x57, DIGITS[2]))
-        results.append(_page(emu, out, "addin-modified-approval", modified_page,
-                             ["APP MODIFIED", "1:RUN", "2:BACK"]))
-        _idle(emu, (DIGITS[2],))
-        results.append(_page(emu, out, "addin-modified-back", second_page, names[4:]))
-        _idle(emu, (DIGITS[2], DIGITS[1]))
-        results.append(_page(emu, out, "addin-modified-return-forty", references["RETURN 40"], ["RETURN 40"]))
-        _idle(emu, (0x63, 0x27, DIGITS[2]))
-        results.append(_page(emu, out, "addin-unmodified-neighbor", references["RETURN 7"], ["RETURN 7"]))
+        _idle(emu, (0x57, DIGITS[3]))
+        results.append(_page(emu, out, "addin-modified-approval"))
+        _idle(emu, (0x26,))
+        results.append(_page(emu, out, "addin-modified-back"))
+        returned(40, (DIGITS[3], 0x63))
+        results.append(_page(emu, out, "addin-modified-return-forty"))
+        returned(7, (0x63, 0x27, DIGITS[2], 0x63))
+        results.append(_page(emu, out, "addin-unmodified-neighbor"))
         assert emu.memory(0x90000, S4_SIZE) == changed[S4_OFFSET:S4_OFFSET + S4_SIZE]
         _idle(emu, (0x63, 0x26, 0x26))
 

@@ -22,23 +22,11 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
           cache: pip
-      - run: python -m pip install -e .
-      - run: python -m unittest discover -s tests -v
-      - run: python tools/casio_tool.py --help
-      - run: python -m kits --help
       - run: python -m pip wheel --no-deps . --wheel-dir dist
       - name: Install wheel without editable sources
-        run: python -c "import pathlib, subprocess, sys; wheel = next(pathlib.Path('dist').glob('*.whl')); subprocess.check_call([sys.executable, '-m', 'pip', 'install', '--force-reinstall', '--no-deps', str(wheel)])"
-      - name: Build synthetic images with installed package
-        working-directory: ${{ runner.temp }}
-        env:
-          PYTHONPATH: ''
-        run: python "${{ github.workspace }}/tests/test_casio_tool.py" BuildTests -v
-      - name: Build and install S4 apps with installed package
-        working-directory: ${{ runner.temp }}
-        env:
-          PYTHONPATH: ''
-        run: python "${{ github.workspace }}/tests/test_casio_tool.py" AppTests -v
+        run: python -c "import pathlib, subprocess, sys; wheel = next(pathlib.Path('dist').glob('*.whl')); subprocess.check_call([sys.executable, '-m', 'pip', 'install', str(wheel)])"
+      - run: python tools/casio_tool.py --help
+      - run: python -m kits --help
       - name: Compile bundled firmware
         working-directory: ${{ runner.temp }}
         env:

@@ -87,7 +87,8 @@ class _Program:
 
     def const(self, dst, value):
         self.emit(1, dst)
-        self.code.extend(_number(value))
+        # The VM restores the zero imaginary component.
+        self.code.extend(_number(value)[:10])
 
     def mov(self, dst, src):
         self.emit(2, dst, src)
@@ -1590,11 +1591,20 @@ def install(fw):
         cpu.call('slot')
         cpu.er4 = cpu.er0
         cpu.er0 = cpu.er12
-        cpu.er12 += 20
+        cpu.er12 += 10
         cpu.r2 = cpu.r11
-        cpu.r3 = 20
+        cpu.r3 = 10
         cpu.r6 = cpu.r10
         cpu.call('fn_graph_copy')
+        cpu.er4 += 10
+        cpu.r0 = 0
+        cpu.r3 = 10
+        cpu.label('constant_clear')
+        cpu.mem8[cpu.r10, cpu.er4] = cpu.r0
+        cpu.er4 += 1
+        cpu.r3 += 255
+        if cpu.ne:
+            cpu.branch('constant_clear')
         cpu.jump('next')
         cpu.label('move')
         cpu.call('byte')

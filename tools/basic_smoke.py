@@ -41,8 +41,26 @@ class Emulator(MCPClient):
                     if time.monotonic() >= deadline:
                         raise AssertionError(("Native input wait not reached", code, status))
                     time.sleep(0.05)
-            super().keys(code)
-            # ROM-A27's roughly 581 ms held-key poll must observe release.
+            status = self.call("get_status")
+            native = not status["paused"] and self.registers()["lr"] == 0x12a84
+            if native and code != 0x70:
+                # Release after the native scan, before its held-key polling.
+                self.call("add_execution_breakpoint", address=0x12a22)
+                self.call("keyboard_code", code=code, pressed=True)
+                try:
+                    deadline = time.monotonic() + 10
+                    while not self.call("get_status")["paused"]:
+                        if time.monotonic() >= deadline:
+                            raise AssertionError(("Native key not accepted", code))
+                        time.sleep(0.01)
+                finally:
+                    self.call("keyboard_code", code=code, pressed=False)
+                    self.call("remove_execution_breakpoint", address=0x12a22)
+                status = self.call("get_status")
+                if status["program_counter"] == 0x12a22:
+                    self.call("resume")
+            else:
+                super().keys(code)
             time.sleep(0.5)
 
 
@@ -78,7 +96,7 @@ class Emulator(MCPClient):
         assert name in self.records(), f"Native NEW did not create {name}"
 
     def prog(self, page, digit):
-        self.keys(0x17, 0x62, *([0x47] * page), DIGITS[digit])
+        self.keys(0x17, DIGITS[2], 0x62, *([0x47] * page), DIGITS[digit])
 
     def nx(self, name):
         from basic_native import NX_CATEGORIES
@@ -86,14 +104,20 @@ class Emulator(MCPClient):
         category, index = next((category, names.index(name))
                                for category, (_, names) in enumerate(NX_CATEGORIES)
                                if name in names)
-        self.keys(0x17, 0x57, DIGITS[1], DIGITS[category + 1],
-                  *([0x57] * (index // 4)), DIGITS[index % 4 + 1])
+        self.keys(0x17, DIGITS[1],
+                  *([0x57] * (category // 3)), DIGITS[category % 3 + 1],
+                  *([0x57] * (index // 4)), DIGITS[index % 4 + 1], 0x63)
 
     def assign(self, letter):
         self.keys(0x06, 0x03, LETTERS[letter])
 
     def run(self):
-        self.keys(0x63, 0x26, 0x26, 0x52, 0x63)
+        from basic_smoke_apps import _idle
+
+        for code in (0x63, 0x26, 0x26, 0x52, 0x63):
+            _idle(self)
+            self.call("resume")
+            self.keys(code)
 
     def evidence(self, out, name):
         out.joinpath(name + "-lcd.bin").write_bytes(self.memory(0xf800, 512))
@@ -237,7 +261,7 @@ def native(emu, out):
 
     name = next(names)
     emu.create(name)
-    emu.keys(0x17, 0x42, 0x47, 0x42, 0x64, DIGITS[1], 0x33)
+    emu.keys(0x17, DIGITS[2], 0x42, 0x47, 0x42, 0x64, DIGITS[1], 0x33)
     emu.assign("B"); emu.run()
     assert emu.memory(VARIABLE_A + 20, 20) == scalar_integer(1), "Native Abs failed"
     results.append(emu.evidence(out, "abs"))
@@ -740,6 +764,7 @@ def expression_cases(emu, out):
 
 def token_cases(emu, out):
     from basic_native import TOKEN_NAMES, TOKENS, FUNCTIONS
+    from basic_smoke_apps import _idle
 
     emu.call("resume")
     existing = emu.records()
@@ -770,6 +795,8 @@ def token_cases(emu, out):
     expected.extend(b"\xf9\xf7 540672\rMOV R0,#42\rRET\r\xf9\xf8\r")
     assert bytes.fromhex(emu.records()[name]["source"]) == expected + b"\0"
     results.extend(({"token": "ASM"}, {"token": "ENDASM"}))
+    _idle(emu)
+    emu.call("resume")
     emu.keys(0x26, 0x63)
     assert bytes.fromhex(emu.records()[name]["source"]) == expected + b"\0", "Editor reopen changed source"
     emu.evidence(out, "tokens-reopened")
@@ -796,7 +823,11 @@ def token_cases(emu, out):
     time.sleep(0.5)
     assert emu.memory(VARIABLE_A, 20) == scalar_integer(255)
     source = emu.records()[name]["source"]
+    _idle(emu)
+    emu.call("resume")
     emu.keys(0x26, 0x17, DIGITS[2], LETTERS["R"], 0x63)
+    _idle(emu)
+    emu.call("resume")
     assert name not in emu.records() and emu.records()["R" + name]["source"] == source
     results.append({"case": "rename_token_program", "name": "R" + name, "source": source})
     emu.evidence(out, "tokens-renamed")
@@ -885,7 +916,7 @@ def regression_cases(emu, out):
     emu.create(fixture)
     emu.keys(*((DIGITS[4], DIGITS[2], 0x63) * 4), 0x26)
     emu.keys(0x70, 0x26, 0x26, 0x26, 0x70)
-    for keys in ((0x07, 0x42), (0x07, 0x11), (0x52,), (0x06,), (0x57,)):
+    for keys in ((0x07, 0x42), (0x07, 0x11), (0x52,)):
         emu.keys(*keys)
         time.sleep(0.5)
     results = []
@@ -930,8 +961,13 @@ def regression_cases(emu, out):
     try:
         goto(2, f"{address & 65535:04X}")
         assert page() == (address & 0xffe0)
-        emu.keys(0x63, DIGITS[4], DIGITS[1], 0x63)
-        assert emu.memory(address, 8) == b"A" + before[1:], "Hex nibble edit changed adjacent bytes"
+        emu.keys(0x63, DIGITS[1], DIGITS[4], DIGITS[1], 0x63)
+        assert emu.memory(address, 8) == before, "Hex changed SRAM before SAVE"
+        emu.keys(0x57, 0x63, DIGITS[1], DIGITS[4], DIGITS[2], 0x26)
+        emu.keys(0x17, 0x57, DIGITS[3], 0x26)
+        assert emu.memory(address, 8) == before, "Cancelled SAVE changed SRAM"
+        emu.keys(0x17, 0x57, DIGITS[3], 0x63)
+        assert emu.memory(address, 8) == b"A" + before[1:], "Hex SAVE changed a cancelled or adjacent byte"
         results.append(emu.evidence(out, "hex-sram-write"))
     finally:
         emu.call("write_memory", address=address, bytes=list(before))

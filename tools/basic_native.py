@@ -23,15 +23,79 @@ TOKEN_NAMES = (
     "SHL", "SHR", "INKEY", "TICKS", "POINT", "COPY", "FILL", "FLASHWRITE",
     "CLS", "PSET", "LINE", "RECT", "BLIT", "TEXT", "REFRESH", "ASM", "ENDASM",
 )
+OBJECT_COMMANDS = (
+    ("MDIM", 3), ("MSET", 4), ("MGET", 3), ("MROWS", 1), ("MCOLS", 1),
+    ("MADD", 3), ("MSUB", 3), ("MMUL", 3), ("MTRANS", 2), ("RREF", 1),
+    ("MDET", 1), ("MINV", 2),
+    ("SSET", 2), ("SLEN", 1), ("SMID", 4), ("SCAT", 3), ("SFIND", 2),
+    ("SVAL", 1), ("SNUM", 2), ("SPRINT", 1), ("SCHAR", 2), ("SCODE", 2),
+)
 TOKENS = {name: TOKEN_BASE + i for i, name in enumerate(TOKEN_NAMES)}
+TOKENS.update({name: 0xf9c0 + i for i, (name, _) in enumerate(OBJECT_COMMANDS)})
+TOKEN_NAMES += tuple(name for name, _ in OBJECT_COMMANDS)
 FUNCTIONS = frozenset(("PEEK", "PEEK16", "CALL", "BAND", "BOR", "BXOR",
-                       "SHL", "SHR", "INKEY", "TICKS", "POINT"))
+                       "SHL", "SHR", "INKEY", "TICKS", "POINT",
+                       "MGET", "MROWS", "MCOLS", "RREF", "MDET",
+                       "SLEN", "SFIND", "SVAL", "SCODE"))
 NX_CATEGORIES = (
     ("MEM", ("PEEK", "PEEK16", "POKE", "POKE16", "COPY", "FILL", "FLASHWRITE")),
     ("ASM", ("CALL", "ASM", "ENDASM")),
     ("GFX", ("CLS", "PSET", "POINT", "LINE", "RECT", "BLIT", "TEXT", "REFRESH")),
     ("TOOLS", ("BAND", "BOR", "BXOR", "SHL", "SHR", "INKEY", "TICKS")),
+    ("MAT", tuple(name for name, _ in OBJECT_COMMANDS[:12])),
+    ("STR", tuple(name for name, _ in OBJECT_COMMANDS[12:])),
 )
+
+# Argument hints are displayed only; insertion uses the existing token flags.
+COMMAND_HELP = {
+    "PEEK": ("READ BYTE", "(ADDR)"),
+    "PEEK16": ("READ 16-BIT", "(ADDR)"),
+    "POKE": ("RAW BYTE WRITE", "ADDR,VALUE"),
+    "POKE16": ("RAW WORD WRITE", "ADDR,VALUE"),
+    "CALL": ("RUN ASM", "(ADDR[,P0,P1,P2,P3])"),
+    "BAND": ("BITWISE AND", "(A,B)"),
+    "BOR": ("BITWISE OR", "(A,B)"),
+    "BXOR": ("BITWISE XOR", "(A,B)"),
+    "SHL": ("SHIFT LEFT", "(VALUE,BITS)"),
+    "SHR": ("SHIFT RIGHT", "(VALUE,BITS)"),
+    "INKEY": ("KEY CODE", "()"),
+    "TICKS": ("READ TIMER", "()"),
+    "POINT": ("READ PIXEL", "(X,Y)"),
+    "COPY": ("COPY MEMORY", "DST,SRC,LEN"),
+    "FILL": ("FILL MEMORY", "DST,LEN,BYTE"),
+    "FLASHWRITE": ("WRITE FLASH", "DST,SRC,LEN"),
+    "CLS": ("CLEAR BUFFER", "NO ARGS"),
+    "PSET": ("SET PIXEL", "X,Y,MODE"),
+    "LINE": ("DRAW LINE", "X1,Y1,X2,Y2,MODE"),
+    "RECT": ("DRAW RECT", "X1,Y1,X2,Y2,MODE"),
+    "BLIT": ("DRAW BITMAP", "X,Y,W,H,SRC,MODE"),
+    "TEXT": ("DRAW TEXT", 'X,Y,"TEXT",FONT'),
+    "REFRESH": ("SHOW BUFFER", "NO ARGS"),
+    "ASM": ("INLINE ASM", "FLASH ADDR"),
+    "ENDASM": ("CLOSE ASM", "NO ARGS"),
+    "MDIM": ("ZERO MATRIX", "ID,ROWS,COLS"),
+    "MSET": ("WRITE CELL", "ID,ROW,COL,VALUE"),
+    "MGET": ("READ CELL", "(ID,ROW,COL)"),
+    "MROWS": ("ROW COUNT", "(ID)"),
+    "MCOLS": ("COL COUNT", "(ID)"),
+    "MADD": ("MATRIX SUM", "DST,A,B"),
+    "MSUB": ("MATRIX A-B", "DST,A,B"),
+    "MMUL": ("MATRIX A*B", "DST,A,B"),
+    "MTRANS": ("TRANSPOSE", "DST,SRC"),
+    "RREF": ("REDUCE / RANK", "(ID)"),
+    "MDET": ("DETERMINANT", "(ID)"),
+    "MINV": ("INVERSE", "DST,SRC"),
+    "SSET": ("SET STRING", 'ID,"TEXT"'),
+    "SLEN": ("LENGTH", "(ID)"),
+    "SMID": ("SUBSTRING", "DST,SRC,START,COUNT"),
+    "SCAT": ("CONCAT", "DST,A,B"),
+    "SFIND": ("FIND TEXT", "(HAY,NEEDLE)"),
+    "SVAL": ("TEXT TO NUMBER", "(ID)"),
+    "SNUM": ("NUMBER TO TEXT", "ID,VALUE"),
+    "SPRINT": ("SHOW STRING", "ID"),
+    "SCHAR": ("BYTE TO TEXT", "DST,BYTE"),
+    "SCODE": ("READ BYTE", "(ID,INDEX)"),
+}
 
 # C7B6E: ER0/R2 points to a mutable three-byte source cursor. R3 requests
 # the initial fetch. Caller stack: cache offset/bank, result offset/bank,

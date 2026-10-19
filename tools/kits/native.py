@@ -9,8 +9,7 @@ SUB immediate macros are excluded because they would use a hidden stack slot.
 Memory prefixes, LEA, calls and stack operations likewise retain ISA semantics.
 
 An if containing only cpu.branch emits exactly one short conditional branch.
-Structured if/while test existing flags (never an implicit comparison), using
-an inverse short skip and a far jump. A while body must update the flags itself.
+Structured if/while use short branches where the target is reachable.
 Only explicit return/cpu.ret/cpu.pop(cpu.pc) returns; fallthrough is intentional.
 """
 
@@ -76,12 +75,17 @@ class _NativeCompiler:
         self.current = self.node
         self.counter = 0
         self.loops = []
+        self.short_jumps = []
         # Reserve source labels before introducing structural control-flow labels.
         self.labels = set()
         for node in ast.walk(self.node):
             if isinstance(node, ast.Call) and self.cpu_name(node.func) == 'label':
                 self.arity(node, 1)
                 self.labels.add(self.label_name(node.args[0]).upper())
+        self.user_labels = {self.label_name(node.args[0])
+                            for node in ast.walk(self.node)
+                            if isinstance(node, ast.Call)
+                            and self.cpu_name(node.func) == 'label'}
 
     def fail(self, node, message):
         line = self.first_line + getattr(node, 'lineno', 1) - 1
@@ -104,6 +108,12 @@ class _NativeCompiler:
             value = self.globals[node.id]
         elif isinstance(node, (ast.Tuple, ast.List)):
             value = tuple(self.constant(item) for item in node.elts)
+        elif isinstance(node, ast.Call) and self.cpu_name(node.func) == 'address':
+            self.arity(node, 1)
+            symbol = self.label_name(node.args[0])
+            value = self.addresses.get(symbol)
+            if type(value) is not int:
+                self.fail(node, 'unlinked code address: ' + symbol)
         elif isinstance(node, ast.UnaryOp) and isinstance(node.op, (ast.UAdd, ast.USub, ast.Invert)):
             value = self.integer(node.operand)
             value = +value if isinstance(node.op, ast.UAdd) else -value if isinstance(node.op, ast.USub) else ~value
@@ -280,6 +290,16 @@ class _NativeCompiler:
             if self.register(value.operand) != register:
                 self.fail(value, 'negation must assign the same physical register')
             self.emit('NEG ' + register)
+        elif register.startswith('ER') and any(
+                isinstance(node, ast.Call) and self.cpu_name(node.func) == 'address'
+                for node in ast.walk(value)):
+            # Symbolic word immediates must keep their width during placement.
+            immediate = self.integer(value)
+            if not 0 <= immediate <= 65535:
+                self.fail(value, 'word immediate outside 0..65535')
+            index = int(register[2:])
+            self.emit(f'MOV R{index},#{hex(immediate & 255)}',
+                      f'MOV R{index + 1},#{hex(immediate >> 8)}')
         else:
             self.emit(f'MOV {register},{self.operand(value)}')
 
@@ -337,6 +357,7 @@ class _NativeCompiler:
 
     def conditional_jump(self, condition, target):
         skip = self.label()
+        self.short_jumps.append(len(self.lines))
         self.emit(f'{_INVERSE[condition]} {skip}', f'JMP {target}', skip + ':')
 
     def block(self, statements):
@@ -369,6 +390,12 @@ class _NativeCompiler:
                     self.current = branch
                     self.arity(branch.value, 1)
                     self.emit(f'{condition} {self.target(branch.value.args[0], True)}')
+                    continue
+                if (not node.orelse and isinstance(branch, ast.Expr)
+                        and isinstance(branch.value, ast.Call)
+                        and self.cpu_name(branch.value.func) == 'jump'):
+                    self.arity(branch.value, 1)
+                    self.conditional_jump(condition, self.target(branch.value.args[0]))
                     continue
                 other, done = self.label(), self.label()
                 self.conditional_jump(_INVERSE[condition], other)
@@ -411,9 +438,73 @@ class _NativeCompiler:
                 or self.origin >> 16 not in (0, 1, 8, 9, 10, 11, 12, 13, 14, 15)):
             self.fail(self.node, 'origin must be an even ROM/Flash code address')
         self.block(self.node.body)
-        source = '\n'.join(self.lines) + '\n'
+        # Unprefixed memory uses bank 0, but leaves lastDSR unchanged.
+        # Keep the first #0 prefix in each block to preserve DSR reads.
+        zero_dsr = False
+        for index, line in enumerate(self.lines):
+            memory = re.match(r'((?:L|ST) \w+,)(#[^:]+|R\d+|DSR):(.*)\Z', line)
+            if memory:
+                prefix = memory[2]
+                if prefix == '#0x0':
+                    if zero_dsr:
+                        self.lines[index] = memory[1] + memory[3]
+                    zero_dsr = True
+                else:
+                    zero_dsr = False
+            elif (line.endswith(':') or line.split()[0] in
+                  {'CALL', 'JMP', 'BAL', 'RET', 'RTI', 'DB', *_INVERSE}
+                  or 'DSR' in line or line == 'POP PC'):
+                zero_dsr = False
         try:
-            data, _, _ = assemble(source, self.origin)
+            while True:
+                source = '\n'.join(self.lines) + '\n'
+                data, symbols, listing = assemble(source, self.origin)
+                at = {row['line'] - 1: row['address'] for row in listing}
+                shorten = set()
+                for index in self.short_jumps:
+                    target = symbols.get(self.lines[index + 1][4:].upper())
+                    if target is not None and -256 <= target - at[index] - 2 <= 254:
+                        shorten.add(index)
+                inherited = set()
+                for index in range(len(self.lines) - 2):
+                    parts = self.lines[index].split()
+                    if (len(parts) != 2 or parts[0] not in _INVERSE
+                            or index in self.short_jumps or at[index] - self.origin < 16
+                            or self.lines[index + 2].upper() != parts[1].upper() + ':'
+                            or not self.lines[index + 1].startswith(('JMP ', 'BAL '))):
+                        continue
+                    target = symbols.get(self.lines[index + 1][4:].upper())
+                    if target is not None and -256 <= target - at[index] - 2 <= 254:
+                        inherited.add(index)
+                long_conditionals = {index + 1 for index in self.short_jumps}
+                short_unconditional = set()
+                # Keep published entry jump-table slots at offsets 0, 4, 8 and 12.
+                for index, line in enumerate(self.lines):
+                    if (not line.startswith('JMP ') or index in long_conditionals
+                            or at[index] - self.origin < 16):
+                        continue
+                    target = symbols.get(line[4:].upper())
+                    if target is not None and -256 <= target - at[index] - 2 <= 254:
+                        short_unconditional.add(index)
+                if not shorten and not inherited and not short_unconditional:
+                    break
+                lines, locations, pending = [], [], []
+                removed = {index + step for index in shorten for step in (1, 2)}
+                # Source labels may be external entries, so retain them.
+                removed.update(index + 1 for index in inherited)
+                for index, line in enumerate(self.lines):
+                    if index in removed:
+                        continue
+                    if index in shorten or index in inherited:
+                        condition = _INVERSE[line.split()[0]]
+                        line = condition + ' ' + self.lines[index + 1][4:]
+                    elif index in self.short_jumps:
+                        pending.append(len(lines))
+                    elif index in short_unconditional:
+                        line = 'BAL ' + line[4:]
+                    lines.append(line)
+                    locations.append(self.locations[index])
+                self.lines, self.locations, self.short_jumps = lines, locations, pending
         except ValueError as exc:
             match = re.match(r'line (\d+): (.*)', str(exc))
             if match:
@@ -421,6 +512,8 @@ class _NativeCompiler:
             self.fail(self.node, str(exc))
         if (self.origin & 65535) + len(data) > 65536:
             self.fail(self.node, 'function crosses a code bank boundary')
+        self.symbols = {self.function.symbol + '__' + label: symbols[label.upper()]
+                        for label in self.user_labels}
         return data, source
 
 

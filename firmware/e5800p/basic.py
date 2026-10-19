@@ -1,6 +1,7 @@
 """Fixed-layout e5800p basic routines and tables."""
 
 from kits import cpu
+from basic_native import COMMAND_HELP, FUNCTIONS, NX_CATEGORIES, OBJECT_COMMANDS, TOKEN_NAMES
 
 NATIVE_TOKEN_ADMISSION = 0xC30D8
 NATIVE_EVALUATE = 0xC7B6E
@@ -32,6 +33,13 @@ BASIC_DATA_ARG_COUNTS = bytes((
     0x01, 0x01, 0x02, 0x02, 0x05, 0x02, 0x02, 0x02, 0x02, 0x02, 0x00, 0x00, 0x02, 0x03, 0x03, 0x03,
     0x00, 0x03, 0x05, 0x05, 0x06, 0x04, 0x00, 0x00, 0x00,
 ))
+BASIC_INFO = bytes(
+    (count << 4) | (name in FUNCTIONS) | (2 if name in ("MSET", "SNUM") else 0)
+    for name, count in tuple(zip(TOKEN_NAMES[:25], BASIC_DATA_ARG_COUNTS)) + OBJECT_COMMANDS
+) + b"\0"
+BASIC_OBJECT_NAMES = b"".join(name.encode("ascii") + b"\0" for name, _ in OBJECT_COMMANDS)
+BASIC_OBJECT_NAMES += b"\0" * (len(BASIC_OBJECT_NAMES) & 1)
+
 
 BASIC_DATA_ARG_TYPES = bytes((
     0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00,
@@ -1388,73 +1396,21 @@ def install(fw):
         cpu.push(cpu.lr)
         cpu.push(cpu.er4)
         cpu.er4 = cpu.er0
-        cpu.r0 = cpu.mem8[cpu.r2, cpu.er4]
-        cpu.compare(cpu.r0, 0xF9)
-        if cpu.ne:
-            cpu.branch('cond_11')
-        cpu.r0 = cpu.mem8[cpu.r2, cpu.offset(cpu.er4, 0x0001)]
-        cpu.compare(cpu.r0, 0xE0)
-        if cpu.ne:
-            cpu.branch('cond_1')
-        cpu.jump('admit_yes')
-        cpu.label('cond_1')
-        cpu.compare(cpu.r0, 0xE1)
-        if cpu.ne:
-            cpu.branch('cond_2')
-        cpu.jump('admit_yes')
-        cpu.label('cond_2')
-        cpu.compare(cpu.r0, 0xE4)
-        if cpu.ne:
-            cpu.branch('cond_3')
-        cpu.jump('admit_yes')
-        cpu.label('cond_3')
-        cpu.compare(cpu.r0, 0xE5)
-        if cpu.ne:
-            cpu.branch('cond_4')
-        cpu.jump('admit_yes')
-        cpu.label('cond_4')
-        cpu.compare(cpu.r0, 0xE6)
-        if cpu.ne:
-            cpu.branch('cond_5')
-        cpu.jump('admit_yes')
-        cpu.label('cond_5')
-        cpu.compare(cpu.r0, 0xE7)
-        if cpu.ne:
-            cpu.branch('cond_6')
-        cpu.jump('admit_yes')
-        cpu.label('cond_6')
-        cpu.compare(cpu.r0, 0xE8)
-        if cpu.ne:
-            cpu.branch('cond_7')
-        cpu.jump('admit_yes')
-        cpu.label('cond_7')
-        cpu.compare(cpu.r0, 0xE9)
-        if cpu.ne:
-            cpu.branch('cond_8')
-        cpu.jump('admit_yes')
-        cpu.label('cond_8')
-        cpu.compare(cpu.r0, 0xEA)
-        if cpu.ne:
-            cpu.branch('cond_9')
-        cpu.jump('admit_yes')
-        cpu.label('cond_9')
-        cpu.compare(cpu.r0, 0xEB)
-        if cpu.ne:
-            cpu.branch('cond_10')
-        cpu.jump('admit_yes')
-        cpu.label('cond_10')
-        cpu.compare(cpu.r0, 0xEC)
-        if cpu.ne:
-            cpu.branch('cond_11')
-        cpu.jump('admit_yes')
+        cpu.r1 = cpu.mem8[cpu.r2, cpu.er4]
+        cpu.r0 = cpu.mem8[cpu.r2, cpu.offset(cpu.er4, 1)]
+        cpu.call('fn_basic_token')
+        cpu.compare(cpu.r3, 0xFF)
+        if cpu.eq:
+            cpu.branch('admit_native')
+        cpu.r0 = cpu.r3
+        cpu.r0 &= 1
+        cpu.r1 = 0
+        cpu.pop(cpu.er4)
+        cpu.pop(cpu.pc)
         cpu.label('cond_11')
         cpu.label('admit_native')
         cpu.er0 = cpu.er4
         cpu.call(NATIVE_TOKEN_ADMISSION)
-        cpu.pop(cpu.er4)
-        cpu.pop(cpu.pc)
-        cpu.label('admit_yes')
-        cpu.er0 = 0x01
         cpu.pop(cpu.er4)
         cpu.pop(cpu.pc)
         cpu.label('spell')
@@ -1467,57 +1423,32 @@ def install(fw):
         cpu.er0 = cpu.er2
         cpu.ret()
         cpu.label('spell_token')
-        cpu.compare(cpu.r1, 0xF9)
-        if cpu.ne:
-            cpu.branch('spell_native')
-        cpu.compare(cpu.r0, 0xE0)
-        if cpu.lt:
-            cpu.branch('spell_native')
-        cpu.compare(cpu.r0, 0xF9)
-        if cpu.ge:
-            cpu.branch('spell_native')
         cpu.push(cpu.lr)
-        cpu.push(cpu.xr4)
-        cpu.er4 = cpu.er2
-        cpu.r0 += 0x20
-        cpu.r1 = 0x00
-        cpu.shift_left_carry(cpu.r1, 0x01)
-        cpu.r0 <<= 0x01
-        cpu.r6 = 0xDA
-        cpu.r7 = 0x57
-        cpu.er6 += cpu.er0
-        cpu.er6 = cpu.mem16[0x0F, cpu.er6]
-        cpu.label('spell_copy')
-        cpu.r0 = cpu.mem8[0x0F, cpu.er6]
-        cpu.mem8[0x00, cpu.er2] = cpu.r0
-        cpu.er6 += 0x01
-        cpu.er2 += 0x01
-        cpu.compare(cpu.r0, 0x00)
+        cpu.push(cpu.er2)
+        cpu.call('fn_basic_token')
+        cpu.compare(cpu.r3, 0xFF)
+        cpu.pop(cpu.er2)
         if cpu.ne:
-            cpu.branch('spell_copy')
-        cpu.er0 = cpu.er4
-        cpu.pop(cpu.xr4)
+            cpu.branch('spell_owned')
+        cpu.call('spell_native')
+        cpu.pop(cpu.pc)
+        cpu.label('spell_owned')
+        cpu.call('fn_basic_name')
         cpu.pop(cpu.pc)
         cpu.label('spell_native')
         cpu.push(cpu.lr)
         cpu.push(cpu.er12)
         cpu.jump(0xDFC06)
         cpu.label('function')
-        cpu.compare(cpu.r1, 0xF9)
-        if cpu.ne:
-            cpu.branch('function_native')
-        cpu.compare(cpu.r0, 0xE0)
-        if cpu.lt:
-            cpu.branch('function_native')
-        cpu.compare(cpu.r0, 0xF9)
-        if cpu.ge:
+        cpu.call('fn_basic_token')
+        cpu.compare(cpu.r3, 0xFF)
+        if cpu.eq:
             cpu.branch('function_native')
         cpu.push(cpu.xr4)
         cpu.push(cpu.qr8)
         cpu.er12 = cpu.er14
         cpu.sp += -16
         cpu.er14 = cpu.sp
-        cpu.r0 += 0x20
         cpu.mem8[0x00, cpu.offset(cpu.er14, 0x000C)] = cpu.r0
         cpu.r0 = 0x01
         cpu.mem8[0x00, cpu.offset(cpu.er14, 0x000D)] = cpu.r0
@@ -1544,79 +1475,18 @@ def install(fw):
         cpu.jump(0xC7202)
         cpu.label('statement')
         cpu.er0 = cpu.mem16[cpu.r10, cpu.er8]
-        cpu.r2 = cpu.mem8[cpu.r10, cpu.offset(cpu.er8, 0x0002)]
+        cpu.r2 = cpu.mem8[cpu.r10, cpu.offset(cpu.er8, 2)]
         cpu.r3 = cpu.mem8[cpu.r2, cpu.er0]
-        cpu.compare(cpu.r3, 0xF9)
+        cpu.r0 = cpu.mem8[cpu.r2, cpu.offset(cpu.er0, 1)]
+        cpu.r1 = cpu.r3
+        cpu.call('fn_basic_token')
+        cpu.compare(cpu.r3, 0xFF)
         if cpu.eq:
-            cpu.branch('cond_12')
-        cpu.jump('statement_native')
-        cpu.label('cond_12')
-        cpu.r3 = cpu.mem8[cpu.r2, cpu.offset(cpu.er0, 0x0001)]
-        cpu.compare(cpu.r3, 0xE0)
-        if cpu.ge:
-            cpu.branch('cond_13')
-        cpu.jump('statement_native')
-        cpu.label('cond_13')
-        cpu.compare(cpu.r3, 0xF9)
-        if cpu.lt:
-            cpu.branch('cond_14')
-        cpu.jump('statement_native')
-        cpu.label('cond_14')
-        cpu.compare(cpu.r3, 0xE0)
+            cpu.jump('statement_native')
+        cpu.test_bit(cpu.r3, 0)
         if cpu.ne:
-            cpu.branch('cond_15')
-        cpu.jump('statement_expression')
-        cpu.label('cond_15')
-        cpu.compare(cpu.r3, 0xE1)
-        if cpu.ne:
-            cpu.branch('cond_16')
-        cpu.jump('statement_expression')
-        cpu.label('cond_16')
-        cpu.compare(cpu.r3, 0xE4)
-        if cpu.ne:
-            cpu.branch('cond_17')
-        cpu.jump('statement_expression')
-        cpu.label('cond_17')
-        cpu.compare(cpu.r3, 0xE5)
-        if cpu.ne:
-            cpu.branch('cond_18')
-        cpu.jump('statement_expression')
-        cpu.label('cond_18')
-        cpu.compare(cpu.r3, 0xE6)
-        if cpu.ne:
-            cpu.branch('cond_19')
-        cpu.jump('statement_expression')
-        cpu.label('cond_19')
-        cpu.compare(cpu.r3, 0xE7)
-        if cpu.ne:
-            cpu.branch('cond_20')
-        cpu.jump('statement_expression')
-        cpu.label('cond_20')
-        cpu.compare(cpu.r3, 0xE8)
-        if cpu.ne:
-            cpu.branch('cond_21')
-        cpu.jump('statement_expression')
-        cpu.label('cond_21')
-        cpu.compare(cpu.r3, 0xE9)
-        if cpu.ne:
-            cpu.branch('cond_22')
-        cpu.jump('statement_expression')
-        cpu.label('cond_22')
-        cpu.compare(cpu.r3, 0xEA)
-        if cpu.ne:
-            cpu.branch('cond_23')
-        cpu.jump('statement_expression')
-        cpu.label('cond_23')
-        cpu.compare(cpu.r3, 0xEB)
-        if cpu.ne:
-            cpu.branch('cond_24')
-        cpu.jump('statement_expression')
-        cpu.label('cond_24')
-        cpu.compare(cpu.r3, 0xEC)
-        if cpu.ne:
-            cpu.branch('cond_25')
-        cpu.jump('statement_expression')
-        cpu.label('cond_25')
+            cpu.jump('statement_expression')
+        cpu.r3 = cpu.r0
         cpu.er0 = cpu.mem16[0x00, cpu.offset(cpu.er14, 0x000E)]
         cpu.r2 = 0x01
         cpu.mem8[0x00, cpu.offset(cpu.er0, 0x0026)] = cpu.r2
@@ -1625,7 +1495,6 @@ def install(fw):
         cpu.er12 = cpu.er14
         cpu.sp += -16
         cpu.er14 = cpu.sp
-        cpu.r3 += 0x20
         cpu.mem8[0x00, cpu.offset(cpu.er14, 0x000C)] = cpu.r3
         cpu.r0 = 0x00
         cpu.mem8[0x00, cpu.offset(cpu.er14, 0x000D)] = cpu.r0
@@ -1735,12 +1604,10 @@ def install(fw):
             cpu.branch('cond_28')
         cpu.jump('syntax')
         cpu.label('cond_28')
-        cpu.r1 = 0x00
-        cpu.r2 = 0x0C
-        cpu.r3 = 0x58
-        cpu.er2 += cpu.er0
-        cpu.r0 = cpu.mem8[0x0F, cpu.er2]
-        cpu.mem8[0x00, cpu.offset(cpu.er14, 0x00D5)] = cpu.r0
+        cpu.r1 = 0
+        cpu.call('fn_basic_info')
+        cpu.r3 >>= 4
+        cpu.mem8[0, cpu.offset(cpu.er14, 0xD5)] = cpu.r3
         cpu.call('fetch_spaces')
         cpu.r3 = cpu.mem8[0x00, cpu.offset(cpu.er14, 0x00D3)]
         cpu.compare(cpu.r3, 0x00)
@@ -1761,6 +1628,12 @@ def install(fw):
         cpu.label('cond_30')
         cpu.label('argument')
         cpu.r0 = cpu.mem8[0x00, cpu.offset(cpu.er14, 0x00D2)]
+        cpu.compare(cpu.r0, 37)
+        if cpu.eq:
+            cpu.r0 = cpu.mem8[0, cpu.offset(cpu.er14, 0xD4)]
+            cpu.compare(cpu.r0, 1)
+            if cpu.eq:
+                cpu.jump('argument_string')
         cpu.compare(cpu.r0, 0x15)
         if cpu.ne:
             cpu.branch('cond_31')
@@ -1803,6 +1676,21 @@ def install(fw):
         cpu.label('cond_32')
         cpu.r0 = cpu.mem8[0x00, cpu.offset(cpu.er14, 0x00D2)]
         cpu.r1 = 0x00
+        cpu.compare(cpu.r0, 25)
+        if cpu.lt:
+            cpu.jump('argument_old_type')
+        cpu.call('fn_basic_info')
+        cpu.test_bit(cpu.r3, 1)
+        if cpu.ne:
+            cpu.r0 = cpu.mem8[0, cpu.offset(cpu.er14, 0xD4)]
+            cpu.r0 += 1
+            cpu.r1 = cpu.mem8[0, cpu.offset(cpu.er14, 0xD5)]
+            cpu.compare(cpu.r0, cpu.r1)
+            if cpu.eq:
+                cpu.jump('argument_done')
+        cpu.er2 = 1
+        cpu.jump('argument_type_ready')
+        cpu.label('argument_old_type')
         cpu.er2 = 0x06
         cpu.multiply(cpu.er0, cpu.r2)
         cpu.r2 = cpu.mem8[0x00, cpu.offset(cpu.er14, 0x00D4)]
@@ -1813,6 +1701,7 @@ def install(fw):
         cpu.er2 += cpu.er0
         cpu.r2 = cpu.mem8[0x0F, cpu.er2]
         cpu.r3 = 0x00
+        cpu.label('argument_type_ready')
         cpu.r4 = cpu.mem8[0x00, cpu.offset(cpu.er14, 0x00D4)]
         cpu.r5 = 0x00
         cpu.shift_left_carry(cpu.r5, 0x02)
@@ -1897,6 +1786,9 @@ def install(fw):
         cpu.jump('syntax')
         cpu.label('command_dispatch')
         cpu.r0 = cpu.mem8[0x00, cpu.offset(cpu.er14, 0x00D2)]
+        cpu.compare(cpu.r0, 25)
+        if cpu.ge:
+            cpu.jump('command_objects')
         cpu.r1 = 0x00
         cpu.er2 = cpu.er14
         cpu.er2 += 0x3F
@@ -1944,6 +1836,54 @@ def install(fw):
         cpu.call('copy_result')
         cpu.er0 = 0x01
         cpu.jump('command_out')
+        cpu.label('command_objects')
+        cpu.er0 = cpu.er14
+        cpu.er2 = cpu.er12
+        cpu.call('fn_basic_objects')
+        cpu.er0 = cpu.er0
+        if cpu.eq:
+            cpu.jump('cond_43')
+        cpu.jump('command_error')
+        cpu.label('argument_string')
+        cpu.call('cached')
+        cpu.compare(cpu.r0, 0x22)
+        if cpu.ne:
+            cpu.jump('syntax')
+        cpu.call('cursor')
+        cpu.mem16[0, cpu.offset(cpu.er14, 0x78)] = cpu.er0
+        cpu.mem8[0, cpu.offset(cpu.er14, 0x7A)] = cpu.r2
+        cpu.r3 = 0
+        cpu.mem8[0, cpu.offset(cpu.er14, 0x7B)] = cpu.r3
+        cpu.er4 = cpu.er0
+        cpu.r6 = cpu.r2
+        cpu.er8 = 0
+        cpu.label('string_scan')
+        cpu.r0 = cpu.mem8[cpu.r6, cpu.er4]
+        cpu.compare(cpu.r0, 0x22)
+        if cpu.eq:
+            cpu.jump('string_end')
+        cpu.compare(cpu.r0, 0)
+        if cpu.eq:
+            cpu.jump('syntax')
+        cpu.compare(cpu.r0, 0x0C)
+        if cpu.eq:
+            cpu.jump('syntax')
+        cpu.compare(cpu.r0, 0x0D)
+        if cpu.eq:
+            cpu.jump('syntax')
+        cpu.er4 += 1
+        cpu.er8 += 1
+        cpu.jump('string_scan')
+        cpu.label('string_end')
+        cpu.mem16[0, cpu.offset(cpu.er14, 0x7C)] = cpu.er8
+        cpu.er0 = 0
+        cpu.mem16[0, cpu.offset(cpu.er14, 0x7E)] = cpu.er0
+        cpu.er0 = cpu.er4
+        cpu.er0 += 1
+        cpu.r2 = cpu.r6
+        cpu.call('set_cursor')
+        cpu.call('fetch_spaces')
+        cpu.jump('argument_done')
         cpu.label('argument_text')
         cpu.call('cached')
         cpu.compare(cpu.r0, 0x22)
@@ -3409,29 +3349,6 @@ def install(fw):
         cpu.er0 = cpu.er2
         cpu.pop(cpu.xr4)
         cpu.pop(cpu.pc)
-        cpu.label('program_menu')
-        cpu.push(cpu.lr)
-        cpu.push(cpu.xr4)
-        cpu.er4 = cpu.er0
-        cpu.push(cpu.er2)
-        cpu.er0 = cpu.er14
-        cpu.call('editor_context')
-        cpu.pop(cpu.er2)
-        cpu.compare(cpu.r0, 0x01)
-        if cpu.eq:
-            cpu.branch('program_block_menu')
-        cpu.er0 = cpu.er4
-        cpu.call(NATIVE_PROGRAM_FUNCTION)
-        cpu.label('program_menu_return')
-        cpu.pop(cpu.xr4)
-        cpu.pop(cpu.pc)
-        cpu.label('program_block_menu')
-        cpu.er6 = cpu.er14
-        cpu.call('block_menu')
-        cpu.r0 = 0xFF
-        cpu.r1 = 0xFF
-        cpu.pop(cpu.xr4)
-        cpu.pop(cpu.pc)
         cpu.label('native_menu_key')
         cpu.call(0x125FC)
         cpu.compare(cpu.r0, 0xFD)
@@ -3439,14 +3356,6 @@ def install(fw):
             cpu.branch('cond_112')
         cpu.jump('native_menu_key_return')
         cpu.label('cond_112')
-        cpu.er2 = cpu.mem16[0x00, cpu.offset(cpu.er14, 0x0002)]
-        cpu.r0 = 0x04
-        cpu.r1 = 0x51
-        cpu.compare(cpu.er0, cpu.er2)
-        if cpu.eq:
-            cpu.branch('cond_113')
-        cpu.jump('native_menu_right')
-        cpu.label('cond_113')
         cpu.er0 = cpu.mem16[0x00, cpu.offset(cpu.er14, 0xFE5E)]
         cpu.er0 = cpu.er0
         if cpu.eq:
@@ -3462,7 +3371,7 @@ def install(fw):
             cpu.branch('cond_115')
         cpu.jump('native_menu_right')
         cpu.label('cond_115')
-        cpu.call('nx_menu')
+        cpu.call('fn_basic_nx')
         cpu.compare(cpu.r1, 0xFF)
         if cpu.eq:
             cpu.branch('native_menu_back')
@@ -3477,109 +3386,6 @@ def install(fw):
         cpu.r0 = 0xFD
         cpu.label('native_menu_key_return')
         cpu.jump(0xDF554)
-        cpu.label('nx_menu')
-        cpu.push(cpu.lr)
-        cpu.push(cpu.xr4)
-        cpu.label('nx_page')
-        cpu.r0 = 0xBC
-        cpu.r1 = 0x58
-        cpu.er2 = 0x01
-        cpu.call('choose')
-        cpu.compare(cpu.r1, 0xFF)
-        if cpu.ne:
-            cpu.branch('cond_116')
-        cpu.jump('nx_next_3')
-        cpu.label('cond_116')
-        cpu.label('nx_categories')
-        cpu.r0 = 0xBE
-        cpu.r1 = 0x58
-        cpu.er2 = 0x04
-        cpu.call('choose')
-        cpu.compare(cpu.r1, 0xFF)
-        if cpu.ne:
-            cpu.branch('cond_117')
-        cpu.jump('nx_page')
-        cpu.label('cond_117')
-        cpu.er4 = cpu.er0
-        cpu.compare(cpu.r0, 0x00)
-        if cpu.ne:
-            cpu.branch('nx_next_0')
-        cpu.r0 = 0xC6
-        cpu.r1 = 0x58
-        cpu.er2 = 0x07
-        cpu.call('choose')
-        cpu.compare(cpu.r1, 0xFF)
-        if cpu.ne:
-            cpu.branch('cond_118')
-        cpu.jump('cond_116')
-        cpu.label('cond_118')
-        cpu.r2 = 0xD4
-        cpu.r3 = 0x58
-        cpu.er2 += cpu.er0
-        cpu.r0 = cpu.mem8[0x0F, cpu.er2]
-        cpu.r1 = 0xF9
-        cpu.jump('nx_next_3')
-        cpu.label('nx_next_0')
-        cpu.compare(cpu.r0, 0x01)
-        if cpu.ne:
-            cpu.branch('nx_next_1')
-        cpu.r0 = 0xDC
-        cpu.r1 = 0x58
-        cpu.er2 = 0x03
-        cpu.call('choose')
-        cpu.compare(cpu.r1, 0xFF)
-        if cpu.ne:
-            cpu.branch('cond_119')
-        cpu.jump('cond_116')
-        cpu.label('cond_119')
-        cpu.r2 = 0xE2
-        cpu.r3 = 0x58
-        cpu.er2 += cpu.er0
-        cpu.r0 = cpu.mem8[0x0F, cpu.er2]
-        cpu.r1 = 0xF9
-        cpu.jump('nx_next_3')
-        cpu.label('nx_next_1')
-        cpu.compare(cpu.r0, 0x02)
-        if cpu.ne:
-            cpu.branch('nx_next_2')
-        cpu.r0 = 0xE6
-        cpu.r1 = 0x58
-        cpu.er2 = 0x08
-        cpu.call('choose')
-        cpu.compare(cpu.r1, 0xFF)
-        if cpu.ne:
-            cpu.branch('cond_120')
-        cpu.jump('cond_116')
-        cpu.label('cond_120')
-        cpu.r2 = 0xF6
-        cpu.r3 = 0x58
-        cpu.er2 += cpu.er0
-        cpu.r0 = cpu.mem8[0x0F, cpu.er2]
-        cpu.r1 = 0xF9
-        cpu.jump('nx_next_3')
-        cpu.label('nx_next_2')
-        cpu.compare(cpu.r0, 0x03)
-        if cpu.ne:
-            cpu.branch('nx_next_3')
-        cpu.r0 = 0xFE
-        cpu.r1 = 0x58
-        cpu.er2 = 0x07
-        cpu.call('choose')
-        cpu.compare(cpu.r1, 0xFF)
-        if cpu.ne:
-            cpu.branch('cond_121')
-        cpu.jump('cond_116')
-        cpu.label('cond_121')
-        cpu.r2 = 0x0C
-        cpu.r3 = 0x59
-        cpu.er2 += cpu.er0
-        cpu.r0 = cpu.mem8[0x0F, cpu.er2]
-        cpu.r1 = 0xF9
-        cpu.jump('nx_next_3')
-        cpu.label('nx_next_3')
-        cpu.label('nx_out')
-        cpu.pop(cpu.xr4)
-        cpu.pop(cpu.pc)
         cpu.label('choose')
         cpu.push(cpu.lr)
         cpu.push(cpu.xr4)
@@ -3621,7 +3427,11 @@ def install(fw):
         cpu.shift_left_carry(cpu.r1, 0x01)
         cpu.r0 <<= 0x01
         cpu.er0 += cpu.er8
-        cpu.er6 = cpu.mem16[0x0F, cpu.er0]
+        cpu.r3 = 0x0F
+        cpu.test_bit(cpu.r9, 7)
+        if cpu.ne:
+            cpu.r3 = 0x00
+        cpu.er6 = cpu.mem16[cpu.r3, cpu.er0]
         cpu.r0 = cpu.r4
         cpu.r0 += 0x31
         cpu.mem8[0x00, cpu.offset(cpu.er14, 0x0000)] = cpu.r0
@@ -3630,8 +3440,12 @@ def install(fw):
         cpu.er2 = cpu.er14
         cpu.er2 += 0x02
         cpu.r1 = 0x0D
+        cpu.r5 = 0x0F
+        cpu.test_bit(cpu.r7, 7)
+        if cpu.ne:
+            cpu.r5 = 0x00
         cpu.label('choose_text')
-        cpu.r0 = cpu.mem8[0x0F, cpu.er6]
+        cpu.r0 = cpu.mem8[cpu.r5, cpu.er6]
         cpu.mem8[0x00, cpu.er2] = cpu.r0
         cpu.compare(cpu.r0, 0x00)
         if cpu.eq:
@@ -3644,6 +3458,7 @@ def install(fw):
         cpu.r0 = 0x00
         cpu.mem8[0x00, cpu.er2] = cpu.r0
         cpu.label('choose_draw')
+        cpu.r5 = 0x00
         cpu.r1 = cpu.r4
         cpu.r1 <<= 0x03
         cpu.r1 += 0x01
@@ -3822,65 +3637,29 @@ def install(fw):
         cpu.push(cpu.xr4)
         cpu.er0 = cpu.er14
         cpu.call('editor_context')
-        cpu.r3 = cpu.r0
+        cpu.r4 = cpu.r0
         cpu.er0 = cpu.mem16[0x00, cpu.offset(cpu.er14, 0xFFDC)]
-        cpu.compare(cpu.r1, 0xF9)
-        if cpu.ne:
+        cpu.er6 = cpu.er0
+        cpu.call('fn_basic_token')
+        cpu.compare(cpu.r3, 0xFF)
+        if cpu.eq:
             cpu.branch('editor_ascii')
-        cpu.compare(cpu.r0, 0xE0)
-        if cpu.lt:
-            cpu.branch('editor_input_restore')
-        cpu.compare(cpu.r0, 0xF9)
-        if cpu.ge:
-            cpu.branch('editor_input_restore')
+        cpu.er0 = cpu.er6
         cpu.sp += -4
         cpu.er6 = cpu.sp
         cpu.mem8[0x00, cpu.er6] = cpu.r1
         cpu.mem8[0x00, cpu.offset(cpu.er6, 0x0001)] = cpu.r0
         cpu.r2 = 0x20
-        cpu.compare(cpu.r0, 0xE0)
-        if cpu.eq:
-            cpu.branch('editor_parenthesis')
-        cpu.compare(cpu.r0, 0xE1)
-        if cpu.eq:
-            cpu.branch('editor_parenthesis')
-        cpu.compare(cpu.r0, 0xE4)
-        if cpu.eq:
-            cpu.branch('editor_parenthesis')
-        cpu.compare(cpu.r0, 0xE5)
-        if cpu.eq:
-            cpu.branch('editor_parenthesis')
-        cpu.compare(cpu.r0, 0xE6)
-        if cpu.eq:
-            cpu.branch('editor_parenthesis')
-        cpu.compare(cpu.r0, 0xE7)
-        if cpu.eq:
-            cpu.branch('editor_parenthesis')
-        cpu.compare(cpu.r0, 0xE8)
-        if cpu.eq:
-            cpu.branch('editor_parenthesis')
-        cpu.compare(cpu.r0, 0xE9)
-        if cpu.eq:
-            cpu.branch('editor_parenthesis')
-        cpu.compare(cpu.r0, 0xEA)
-        if cpu.eq:
-            cpu.branch('editor_parenthesis')
-        cpu.compare(cpu.r0, 0xEB)
-        if cpu.eq:
-            cpu.branch('editor_parenthesis')
-        cpu.compare(cpu.r0, 0xEC)
-        if cpu.eq:
-            cpu.branch('editor_parenthesis')
-        cpu.jump('editor_token_text')
-        cpu.label('editor_parenthesis')
-        cpu.r2 = 0x28
+        cpu.test_bit(cpu.r3, 0)
+        if cpu.ne:
+            cpu.r2 = 0x28
         cpu.label('editor_token_text')
         cpu.mem8[0x00, cpu.offset(cpu.er6, 0x0002)] = cpu.r2
         cpu.er0 = cpu.er6
         cpu.er2 = 0x03
         cpu.jump('editor_insert_buffer')
         cpu.label('editor_ascii')
-        cpu.compare(cpu.r3, 0x01)
+        cpu.compare(cpu.r4, 0x01)
         if cpu.ne:
             cpu.branch('editor_input_restore')
         cpu.compare(cpu.r1, 0x7D)
@@ -4230,6 +4009,428 @@ def install(fw):
         cpu.er6 = cpu.er12
         cpu.call('editor_insert')
         cpu.label('block_out')
+        cpu.pop(cpu.qr8)
+        cpu.pop(cpu.xr4)
+        cpu.pop(cpu.pc)
+
+    @fw.function(native=True)
+    def basic_token():
+        cpu.compare(cpu.r1, 0xF9)
+        if cpu.ne:
+            cpu.jump('unknown')
+        cpu.compare(cpu.r0, 0xE0)
+        if cpu.ge:
+            cpu.compare(cpu.r0, 0xF9)
+            if cpu.ge:
+                cpu.jump('unknown')
+            cpu.r0 += 0x20
+            cpu.jump('found')
+        cpu.compare(cpu.r0, 0xC0)
+        if cpu.lt:
+            cpu.jump('unknown')
+        cpu.compare(cpu.r0, 0xD6)
+        if cpu.ge:
+            cpu.jump('unknown')
+        cpu.r0 += 0x59
+        cpu.label('found')
+        cpu.r1 = 0
+        cpu.jump('fn_basic_info')
+        cpu.label('unknown')
+        cpu.r3 = 0xFF
+        cpu.ret()
+
+    @fw.function(native=True)
+    def basic_info():
+        cpu.push(cpu.lr)
+        cpu.push(cpu.er4)
+        cpu.push(cpu.r2)
+        cpu.er4 = cpu.er0
+        cpu.call('flags')
+        cpu.data(BASIC_INFO)
+        cpu.label('flags')
+        cpu.push(cpu.lr)
+        cpu.pop(cpu.xr0)
+        cpu.er0 += cpu.er4
+        cpu.r3 = cpu.mem8[cpu.r2, cpu.er0]
+        cpu.er0 = cpu.er4
+        cpu.pop(cpu.r2)
+        cpu.pop(cpu.er4)
+        cpu.pop(cpu.pc)
+
+    @fw.function(native=True)
+    def basic_name():
+        cpu.push(cpu.lr)
+        cpu.push(cpu.xr4)
+        cpu.push(cpu.xr8)
+        cpu.er4 = cpu.er2
+        cpu.compare(cpu.r0, 25)
+        if cpu.ge:
+            cpu.jump('object')
+        cpu.er0 += cpu.er0
+        cpu.er6 = 0x57DA
+        cpu.er6 += cpu.er0
+        cpu.er8 = cpu.mem16[15, cpu.er6]
+        cpu.r10 = 15
+        cpu.jump('copy')
+        cpu.label('object')
+        cpu.r0 += 231
+        cpu.r7 = cpu.r0
+        cpu.call('names')
+        cpu.data(BASIC_OBJECT_NAMES)
+        cpu.label('names')
+        cpu.push(cpu.lr)
+        cpu.pop(cpu.xr8)
+        cpu.label('skip')
+        cpu.compare(cpu.r7, 0)
+        if cpu.eq:
+            cpu.jump('copy')
+        cpu.r0 = cpu.mem8[cpu.r10, cpu.er8]
+        cpu.er8 += 1
+        cpu.compare(cpu.r0, 0)
+        if cpu.eq:
+            cpu.r7 += 255
+        cpu.jump('skip')
+        cpu.label('copy')
+        cpu.er2 = cpu.er4
+        cpu.label('byte')
+        cpu.r0 = cpu.mem8[cpu.r10, cpu.er8]
+        cpu.mem8[0, cpu.er2] = cpu.r0
+        cpu.er8 += 1
+        cpu.er2 += 1
+        cpu.compare(cpu.r0, 0)
+        if cpu.ne:
+            cpu.branch('byte')
+        cpu.er0 = cpu.er4
+        cpu.pop(cpu.xr8)
+        cpu.pop(cpu.xr4)
+        cpu.pop(cpu.pc)
+
+    @fw.function(native=True)
+    def basic_objects():
+        # main follows system/library; its allocations preserve PROGRAM sources.
+        cpu.push(cpu.lr)
+        cpu.push(cpu.xr4)
+        cpu.push(cpu.er8)
+        cpu.er8 = cpu.er0
+        cpu.er2 = cpu.er8
+        cpu.er2 += 63
+        cpu.er2 += 53
+        cpu.er4 = cpu.er8
+        cpu.er4 += 63
+        cpu.er4 += 63
+        cpu.er4 += 18
+        cpu.er6 = cpu.er4
+        cpu.r0 = cpu.mem8[0, cpu.offset(cpu.er8, 0xD2)]
+        cpu.r0 += 231
+        cpu.compare(cpu.r0, 12)
+        if cpu.ge:
+            cpu.jump('string')
+        cpu.call('fn_matrix')
+        cpu.jump('done')
+        cpu.label('string')
+        cpu.r0 += 244
+        cpu.call('fn_strings')
+        cpu.label('done')
+        cpu.pop(cpu.er8)
+        cpu.pop(cpu.xr4)
+        cpu.pop(cpu.pc)
+
+    categories = b"EXT\0" + b"".join(name.encode("ascii") + b"\0" for name, _ in NX_CATEGORIES) + b"\0"
+    categories += b"\0" * (len(categories) & 1)
+    pool = b"".join(bytes((len(names),)) + bytes(TOKEN_NAMES.index(name) for name in names)
+                    for _, names in NX_CATEGORIES)
+    pool += b"\0" * (len(pool) & 1)
+
+    @fw.function(native=True)
+    def basic_nx():
+        cpu.push(cpu.lr)
+        cpu.push(cpu.xr4)
+        cpu.push(cpu.qr8)
+        cpu.sp += -128
+        cpu.sp += -44
+        cpu.er14 = cpu.sp
+        cpu.label('categories')
+        cpu.call('fn_ui_menu')
+        cpu.data(categories)
+        cpu.compare(cpu.r1, 0xFF)
+        if cpu.eq:
+            cpu.jump('done')
+        cpu.r4 = cpu.r0
+        cpu.call('pool')
+        cpu.data(pool)
+        cpu.label('pool')
+        cpu.push(cpu.lr)
+        cpu.pop(cpu.xr8)
+        cpu.label('skip')
+        cpu.compare(cpu.r4, 0)
+        if cpu.eq:
+            cpu.jump('commands')
+        cpu.r0 = cpu.mem8[cpu.r10, cpu.er8]
+        cpu.r1 = 0
+        cpu.er8 += cpu.er0
+        cpu.er8 += 1
+        cpu.r4 += 255
+        cpu.jump('skip')
+        cpu.label('commands')
+        cpu.r4 = cpu.mem8[cpu.r10, cpu.er8]
+        cpu.er8 += 1
+        cpu.mem16[0, cpu.offset(cpu.er14, 168)] = cpu.er8
+        cpu.er12 = cpu.er14
+        cpu.er6 = cpu.er14
+        cpu.er6 += 24
+        cpu.r5 = 0
+        cpu.label('command')
+        cpu.mem16[0, cpu.er12] = cpu.er6
+        cpu.er12 += 2
+        cpu.r0 = cpu.mem8[cpu.r10, cpu.er8]
+        cpu.r1 = 0
+        cpu.er8 += 1
+        cpu.er2 = cpu.er6
+        cpu.call('fn_basic_name')
+        cpu.er6 += 12
+        cpu.r5 += 1
+        cpu.compare(cpu.r5, cpu.r4)
+        if cpu.lt:
+            cpu.branch('command')
+        cpu.label('select_command')
+        cpu.er0 = cpu.er14
+        cpu.r2 = cpu.r4
+        cpu.r3 = 0
+        cpu.call('fn_basic__choose')
+        cpu.compare(cpu.r1, 0xFF)
+        if cpu.eq:
+            cpu.jump('categories')
+        cpu.er8 = cpu.mem16[0, cpu.offset(cpu.er14, 168)]
+        cpu.er8 += cpu.er0
+        cpu.r0 = cpu.mem8[cpu.r10, cpu.er8]
+        cpu.r6 = cpu.r0
+        cpu.call('fn_basic_card')
+        cpu.compare(cpu.r0, 0)
+        if cpu.eq:
+            cpu.jump('select_command')
+        cpu.r0 = cpu.r6
+        cpu.compare(cpu.r0, 25)
+        if cpu.ge:
+            cpu.jump('object')
+        cpu.r0 += 0xE0
+        cpu.jump('token')
+        cpu.label('object')
+        cpu.r0 += 0xA7
+        cpu.label('token')
+        cpu.r1 = 0xF9
+        cpu.label('done')
+        cpu.sp += 127
+        cpu.sp += 45
+        cpu.pop(cpu.qr8)
+        cpu.pop(cpu.xr4)
+        cpu.pop(cpu.pc)
+
+    # Six-bit ASCII, least-significant bits first; zero ends each string.
+    help_text = b"".join(text.encode("ascii") + b"\0"
+                         for name in TOKEN_NAMES for text in COMMAND_HELP[name])
+    if any(c and (not 0x20 <= c <= 0x5F or c == 0x40) for c in help_text):
+        raise ValueError('Help text requires ASCII 20-5F except @')
+    help_pool = bytearray()
+    bits = count = 0
+    for c in help_text:
+        bits |= (c & 63) << count
+        count += 6
+        if count >= 8:
+            help_pool.append(bits & 255)
+            bits >>= 8
+            count -= 8
+    if count:
+        help_pool.append(bits)
+    help_pool = bytes(help_pool)
+    help_pool += b"\0" * (len(help_pool) & 1)
+
+    @fw.function(native=True)
+    def basic_card():
+        # R0 is the command index; ER0 returns 1 to insert or 0 to go back.
+        cpu.push(cpu.lr)
+        cpu.push(cpu.xr4)
+        cpu.push(cpu.qr8)
+        cpu.sp += -24
+        cpu.er14 = cpu.sp
+        cpu.r4 = cpu.r0
+        cpu.call(0x0409A)
+        cpu.r0 = cpu.r4
+        cpu.r1 = 0
+        cpu.er2 = cpu.er14
+        cpu.call('fn_basic_name')
+        cpu.r11 = 1
+        cpu.call('line')
+        cpu.call('pool')
+        cpu.data(help_pool)
+        cpu.label('pool')
+        cpu.push(cpu.lr)
+        cpu.pop(cpu.xr8)
+        cpu.r12 = cpu.r4
+        cpu.r12 <<= 1
+        cpu.r6 = 0
+        cpu.label('skip')
+        cpu.compare(cpu.r12, 0)
+        if cpu.eq:
+            cpu.jump('description')
+        cpu.call('char')
+        cpu.compare(cpu.r0, 0)
+        if cpu.eq:
+            cpu.r12 += 255
+        cpu.jump('skip')
+        cpu.label('description')
+        cpu.r11 = 9
+        cpu.call('copy')
+        cpu.r11 = 17
+        cpu.call('copy')
+        cpu.er0 = cpu.er14
+        cpu.call('fn_apps_copy_text')
+        cpu.data(b'EXE INSERT / EXIT BACK\0\0')
+        cpu.r11 = 25
+        cpu.call('line')
+        cpu.call(ROM_REFRESH)
+        cpu.label('key')
+        cpu.call(HEX_KEY_ADDRESS)
+        cpu.compare(cpu.r0, 0x0D)
+        if cpu.eq:
+            cpu.jump('insert')
+        cpu.compare(cpu.r0, 0xFA)
+        if cpu.ne:
+            cpu.jump('key')
+        cpu.er0 = 0
+        cpu.jump('done')
+        cpu.label('insert')
+        cpu.er0 = 1
+        cpu.label('done')
+        cpu.sp += 24
+        cpu.pop(cpu.qr8)
+        cpu.pop(cpu.xr4)
+        cpu.pop(cpu.pc)
+        cpu.label('copy')
+        cpu.push(cpu.lr)
+        cpu.er2 = cpu.er14
+        cpu.label('byte')
+        cpu.call('char')
+        cpu.mem8[0, cpu.er2] = cpu.r0
+        cpu.er2 += 1
+        cpu.compare(cpu.r0, 0)
+        if cpu.ne:
+            cpu.jump('byte')
+        cpu.call('line')
+        cpu.pop(cpu.pc)
+        cpu.label('line')
+        cpu.er2 = cpu.er14
+        cpu.r0 = 0
+        cpu.r1 = cpu.r11
+        cpu.jump('fn_small_text')
+        cpu.label('char')
+        cpu.r7 = 0
+        cpu.r5 = 6
+        cpu.label('bit')
+        cpu.compare(cpu.r6, 0)
+        if cpu.eq:
+            cpu.r4 = cpu.mem8[cpu.r10, cpu.er8]
+            cpu.er8 += 1
+            cpu.r6 = 8
+        cpu.r0 = cpu.r4
+        cpu.r0 &= 1
+        cpu.r7 >>= 1
+        cpu.compare(cpu.r0, 0)
+        if cpu.ne:
+            cpu.r7 |= 0x20
+        cpu.r4 >>= 1
+        cpu.r6 += 255
+        cpu.r5 += 255
+        if cpu.ne:
+            cpu.branch('bit')
+        cpu.r0 = cpu.r7
+        cpu.compare(cpu.r0, 0)
+        if cpu.eq:
+            cpu.ret()
+        cpu.compare(cpu.r0, 0x20)
+        if cpu.lt:
+            cpu.r0 |= 0x40
+        cpu.ret()
+
+    @fw.function(native=True)
+    def basic_menu():
+        # ER0 is the native token buffer; R2 is the editor kind.
+        # FUNCTION's caller redraws only its current line.
+        cpu.push(cpu.lr)
+        cpu.push(cpu.xr4)
+        cpu.push(cpu.qr8)
+        cpu.er4 = cpu.er0
+        cpu.push(cpu.er2)
+        cpu.sp += -128
+        cpu.sp += -128
+        cpu.sp += -128
+        cpu.er6 = cpu.sp
+        cpu.er8 = 0x80E0
+        cpu.er10 = 192
+        cpu.label('save')
+        cpu.er0 = cpu.mem16[0, cpu.er8]
+        cpu.mem16[0, cpu.er6] = cpu.er0
+        cpu.er6 += 2
+        cpu.er8 += 2
+        cpu.er10 += -1
+        if cpu.ne:
+            cpu.branch('save')
+        cpu.er0 = cpu.er14
+        cpu.call('fn_basic__editor_context')
+        cpu.compare(cpu.r0, 1)
+        if cpu.eq:
+            cpu.jump('block')
+        cpu.label('menu')
+        cpu.call('fn_ui_menu')
+        cpu.data(b'PROGRAM\0EXT\0NATIVE\0\0')
+        cpu.compare(cpu.r1, 0xFF)
+        if cpu.eq:
+            cpu.jump('cancel')
+        cpu.compare(cpu.r0, 0)
+        if cpu.eq:
+            cpu.jump('ext')
+        cpu.er6 = cpu.sp
+        cpu.er2 = cpu.mem16[0, cpu.offset(cpu.er6, 384)]
+        cpu.er0 = cpu.er4
+        cpu.call(NATIVE_PROGRAM_FUNCTION)
+        cpu.compare(cpu.r1, 0xFF)
+        if cpu.eq:
+            cpu.jump('menu')
+        cpu.jump('restore')
+        cpu.label('ext')
+        cpu.call('fn_basic_nx')
+        cpu.compare(cpu.r1, 0xFF)
+        if cpu.eq:
+            cpu.jump('menu')
+        cpu.mem16[0, cpu.er4] = cpu.er0
+        cpu.er0 = 1
+        cpu.jump('restore')
+        cpu.label('cancel')
+        cpu.er0 = 0xFFFF
+        cpu.jump('restore')
+        cpu.label('block')
+        cpu.er6 = cpu.er14
+        cpu.call('fn_basic__block_menu')
+        cpu.er0 = 0xFFFF
+        cpu.label('restore')
+        cpu.er6 = cpu.sp
+        cpu.er8 = 0x80E0
+        cpu.er10 = 192
+        cpu.label('copy')
+        cpu.er2 = cpu.mem16[0, cpu.er6]
+        cpu.mem16[0, cpu.er8] = cpu.er2
+        cpu.er6 += 2
+        cpu.er8 += 2
+        cpu.er10 += -1
+        if cpu.ne:
+            cpu.branch('copy')
+        cpu.push(cpu.er0)
+        cpu.call(ROM_REFRESH)
+        cpu.pop(cpu.er0)
+        cpu.sp += 127
+        cpu.sp += 127
+        cpu.sp += 127
+        cpu.sp += 3
+        cpu.pop(cpu.er2)
         cpu.pop(cpu.qr8)
         cpu.pop(cpu.xr4)
         cpu.pop(cpu.pc)

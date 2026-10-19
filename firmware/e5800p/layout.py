@@ -218,7 +218,7 @@ REGIONS = (
         'original_sha256': 'a818847102ee5cade5ca790f6888e7eb065d867b31a39b9a9ebc2586d8e4d627',
     },
     {
-        'name': 'graph_names',
+        'name': 'graph_init',
         'cpu_start': 0x81C42,
         'physical_start': 0x1C42,
         'size': 0x44,
@@ -1890,11 +1890,12 @@ REGIONS = (
 )
 
 WRITABLE_REGIONS = (
-    (0x80200, 0x83000),
+    # Journal routines live in S0; their data/erase sectors are S1/S2 (84000..87FFF).
+    (0x80200, 0x84000),
     (0xF3E68, 0xFFFE0),
 ) + tuple(
     (region['cpu_start'], region['cpu_start'] + region['size'])
     for region in REGIONS
-    if not (0x80200 <= region['cpu_start'] < 0x83000
+    if not (0x80200 <= region['cpu_start'] < 0x84000
             or 0xF3E68 <= region['cpu_start'] < 0xFFFE0)
 )

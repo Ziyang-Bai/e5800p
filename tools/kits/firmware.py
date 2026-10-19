@@ -171,11 +171,25 @@ class Firmware:
         sizes, addresses = {}, {}
         if self.functions:
             from .compiler import compile_function
+            from .native import _NativeCompiler
+
+            def compile_at(fn, origin, targets):
+                if fn.native:
+                    compiler = _NativeCompiler(fn, origin, targets)
+                    data, source = compiler.compile()
+                    return data, source, compiler.symbols
+                data, source = compile_function(fn, origin, targets)
+                return data, source, {}
 
             dummy = {fn.symbol: fn.address if fn.address is not None else FLASH_BASE
                      for fn in self.functions}
             for fn in self.functions:
-                data, _ = compile_function(fn, dummy[fn.symbol], dummy)
+                if fn.native:
+                    compiler = _NativeCompiler(fn, dummy[fn.symbol], dummy)
+                    dummy.update({fn.symbol + '__' + label: dummy[fn.symbol]
+                                  for label in compiler.user_labels})
+            for fn in self.functions:
+                data, _, _ = compile_at(fn, dummy[fn.symbol], dummy)
                 if not data or len(data) & 1 or len(data) > 0x10000:
                     raise ValueError(f'{fn.name}: invalid compiled code size')
                 sizes[fn.symbol] = len(data)
@@ -191,9 +205,9 @@ class Firmware:
                 reserve(fn.address, size, fn.name)
                 addresses[fn.symbol] = fn.address
 
-            for fn in self.functions:
-                if fn.address is not None:
-                    continue
+            movable = sorted((fn for fn in self.functions if fn.address is None),
+                             key=lambda fn: sizes[fn.symbol], reverse=True)
+            for fn in movable:
                 size = sizes[fn.symbol]
                 address = None
                 for start, stop in self.regions:
@@ -216,10 +230,18 @@ class Firmware:
                 reserve(address, size, fn.name)
                 addresses[fn.symbol] = address
 
+            # Resolve all forward interior labels before compiling their callers.
+            labels = {}
+            for fn in self.functions:
+                if fn.native:
+                    _, _, symbols = compile_at(fn, addresses[fn.symbol],
+                                               dict(dummy, **addresses))
+                    labels.update(symbols)
+            addresses.update(labels)
         blocks = []
         for fn in self.functions:
             address = addresses[fn.symbol]
-            data, source = compile_function(fn, address, addresses)
+            data, source, _ = compile_at(fn, address, addresses)
             if len(data) != sizes[fn.symbol]:
                 raise ValueError(f'{fn.name}: compiled size changed after placement')
             blocks.append(dict(name=fn.name, address=address, data=data, source=source,
@@ -245,6 +267,8 @@ class Firmware:
                 blocks.append(dict(name=f'hook_{address:05x}', address=address,
                                    data=data, source=source, kind='code'))
         symbols = {fn.name: addresses[fn.symbol] for fn in self.functions}
+        symbols.update({name: address for name, address in addresses.items()
+                        if '__' in name})
         for item in self._data:
             symbols[item['name']] = item['address']
             symbols.update({item['name'] + '__' + label: item['address'] + offset
@@ -268,20 +292,16 @@ class Firmware:
                 raise ValueError(f"Original region hash mismatch: {row['name']}")
         linked = self.link()
         metadata = {row['name']: row for row in self.original_regions}
-        if metadata and set(metadata) != {block['name'] for block in linked['blocks']}:
-            raise ValueError('Compiled blocks do not match original regions')
         regions = []
         for block in linked['blocks']:
             address, size = block['address'], len(block['data'])
             row = metadata.get(block['name'])
-            if row is not None:
-                if (address != row['cpu_start'] or size != row['size']
-                        or block['kind'] != row['kind']):
-                    raise ValueError(f"{block['name']}: compiled region does not match fixed layout")
-                stop = row['reserved_stop']
-            else:
-                stop = next((end for start, end in self.regions
-                             if start <= address and address + size <= end), address + size)
+            if row is not None and block['kind'] != row['kind']:
+                raise ValueError(f"{block['name']}: compiled region kind changed")
+            if row is not None and row['kind'] == 'data' and address != row['cpu_start']:
+                raise ValueError(f"{block['name']}: fixed data address changed")
+            stop = next((end for start, end in self.regions
+                         if start <= address and address + size <= end), address + size)
             regions.append(dict(name=block['name'], cpu_start=address,
                                 physical_start=address - FLASH_BASE, size=size,
                                 reserved_stop=stop, kind=block['kind']))

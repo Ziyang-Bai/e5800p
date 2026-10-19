@@ -1,8 +1,9 @@
 # e.basic：e5800p 实现使用指南
 
-在型号副本中[加载 e5800p 并备份](e5800p.md#加载与备份)，进入原生 PROGRAM 输入、保存和运行 e.basic。固件增加 25 个 NX 词条，沿用原生变量、表达式、控制流和文件保存。
+在型号副本中[加载 e5800p 并备份](e5800p.md#加载与备份)，进入原生 PROGRAM 输入、保存和运行 e.basic。扩展词条沿用原生变量、表达式、控制流和文件保存。
 
-- [输入与运行](#输入与运行)：新建程序、NX 菜单和键盘操作。
+- [输入与运行](#输入与运行)：新建程序、EXT 菜单和键盘操作。
+- [矩阵与字符串](#矩阵与字符串)：编号对象、矩阵化简和文本输出。
 - [BASIC 图形](#basic-图形)：画边框、文字和像素。
 - [内联 ASM](#内联-asm)：编译并调用返回 42 的程序。
 - [内存与底层函数](#内存与底层函数)、[CALL](#call返回-basic-的汇编调用)：本机地址、ROM 服务和使用风险。
@@ -11,37 +12,39 @@
 
 ## 输入与运行
 
-在 MODE → 5:PROG → 1:PROG 选择 NEW，输入未使用的程序名（例如 `CLOCK`），按 EXE，选择 COMP 类型进入编辑器，输入：
+在 MODE → 5 的 PROGRAM 菜单选 `1:PROG`，选择 NEW，输入未使用的程序名（例如 `CLOCK`），按 EXE，选择 COMP 类型进入编辑器，输入：
 
 ```text
 TICKS()
 ```
 
-1. 按 FUNCTION → 右 → 1:NX → 4:TOOLS，右键翻到第二页，选 3:TICKS。编辑器会插入 `TICKS(`，补上右括号。
+1. 按 FUNCTION → 1:EXT → 右 → 1:TOOLS，右键翻到命令第二页，选 3:TICKS。查看命令说明后按 EXE，编辑器插入 `TICKS(`，补上右括号。
 2. 按 EXE 结束这一行，再按 EXIT 返回程序菜单；必要时再按一次 EXIT。源码由原生 PROGRAM 保存。
 3. 选择 RUN，选中 `CLOCK` 后按 EXE。表达式返回 0～255 的原始计数值，重复运行时数值随模拟时间变化。
 4. 用 EDIT 重开 `CLOCK`，继续修改源码。
 
 要保留程序到下次启动，按[关机保存步骤](e5800p.md#在模拟器中保存程序)操作。
 
-### NX 菜单
+### EXT 菜单
 
-普通 BASIC 区按 FUNCTION → 右 → 1:NX 打开扩展类别。菜单每页四项，数字 1～4 选择，左/右翻页，EXIT 返回上级。
+普通 BASIC 区按 FUNCTION 打开 PROGRAM 菜单：`1:EXT` 进入扩展类别，`2:NATIVE` 进入原生菜单。扩展类别每页三项，命令每页四项；数字直接选择，左/右翻页，EXIT 返回上级。原生菜单右键快捷入口也可直接打开扩展类别。
 
 | 类别 | 词条顺序 |
 |---|---|
 | `1:MEM` | PEEK、PEEK16、POKE、POKE16、COPY、FILL、FLASHWRITE |
 | `2:ASM` | CALL、ASM、ENDASM |
 | `3:GFX` | CLS、PSET、POINT、LINE、RECT、BLIT、TEXT、REFRESH |
-| `4:TOOLS` | BAND、BOR、BXOR、SHL、SHR、INKEY、TICKS |
+| 右 → `1:TOOLS` | BAND、BOR、BXOR、SHL、SHR、INKEY、TICKS |
+| 右 → `2:MAT` | MDIM、MSET、MGET、MROWS、MCOLS、MADD、MSUB、MMUL、MTRANS、RREF、MDET、MINV |
+| 右 → `3:STR` | SSET、SLEN、SMID、SCAT、SFIND、SVAL、SNUM、SPRINT、SCHAR、SCODE |
 
-函数插入词条和左括号，语句插入词条和空格。用原生编辑器补齐数字、变量、逗号和括号；每个双字节 token 是一个完整的移动和删除单位。原生 Getkey、Locate、While 等仍从原菜单输入。表达式的求值顺序、嵌套及类型检查见[语法、类型与求值](e.basic.md#语法类型与求值)。
+选择命令后显示名称、用途、签名及 `EXE INSERT / EXIT BACK`。EXE 插入原 token：函数附左括号，语句附空格；EXIT 依次返回命令、类别、PROGRAM 菜单和编辑器。用原生编辑器补齐数字、变量、逗号和括号；每个双字节 token 是一个完整的移动和删除单位。原生 Getkey、Locate、While 等从 NATIVE 菜单输入。程序列表按 FUNCTION 改名。表达式的求值顺序、嵌套及类型检查见[语法、类型与求值](e.basic.md#语法类型与求值)。
 
 ### 键盘输入
 
 普通 BASIC 按原生键盘规则输入；ASM 正文改为 ASCII 文本输入。两者都用方向键移动光标、删除键修改、EXE 换行。ASM 与 ENDASM 各占独立行。
 
-进入 ASM 正文后，ALPHA 输入字母，数字键输入 ASCII 数字，FUNCTION 打开以下菜单；分页和选择键与 NX 菜单相同：
+进入 ASM 正文后，ALPHA 输入字母，数字键输入 ASCII 数字，FUNCTION 打开以下菜单；数字选择，左/右翻页，EXIT 返回上级：
 
 | 菜单 | 内容 |
 |---|---|
@@ -52,9 +55,36 @@ TICKS()
 
 将模板中的 `LABEL` 改为实际标签，按需修改 `R0`、`#0` 等默认操作数。ENDASM 只能在行首插入，后续新行恢复普通 BASIC 输入。修改 ASM/ENDASM 后，编辑器按源码块边界重新判断输入模式。
 
+## 矩阵与字符串
+
+打开 EXT 类别菜单，按右键进入第二页，选择 `2:MAT` 或 `3:STR`。新建 COMP 程序，输入：
+
+```text
+MDIM 1,2,2
+MSET 1,1,1,1
+MSET 1,1,2,2
+MSET 1,2,1,3
+MSET 1,2,2,4
+MDET(1)→A
+RREF(1)→R
+```
+
+A 得到 −2，R 得到秩 2，矩阵 1 变为单位矩阵。用 `MGET(1,行,列)` 读取元素；矩阵编号和行列索引均填整数，行列从 1 开始。
+
+字符串使用独立的编号：
+
+```text
+SSET 1,"HELLO "
+SSET 2,"WORLD"
+SCAT 3,1,2
+SPRINT 3
+```
+
+运行后显示 `HELLO WORLD`，按 EXE 继续。对象占用原生程序存储，运算还需要临时空间；存储不足时缩小对象或拆分表达式。全部签名和错误条件见[矩阵](e.basic.md#矩阵)、[字符串](e.basic.md#字符串)。
+
 ## BASIC 图形
 
-新建 COMP 程序，通过 FUNCTION → 右 → 1:NX → 3:GFX 插入绘图词条。While/WhileEnd 从原生控制流菜单插入。
+新建 COMP 程序，通过 FUNCTION → 1:EXT → 3:GFX 插入绘图词条。While/WhileEnd 从 NATIVE 的原生控制流菜单插入。
 
 ```text
 CLS
@@ -78,7 +108,7 @@ WhileEnd
 
 示例把机器码放在 `9:2000`（`0x92000`，十进制 598016），源码与 [`examples/return42.asm`](../examples/return42.asm) 相同。银行 9 用于原生 Built-in Prog/YAMAYO 库或 Add-in；先备份并确认覆盖范围。需要 0→1 转换时，先擦除整个 sector 4，会删除银行 9 中的原生库或应用。操作见 [Flash 原始编程与显式擦除](#flash-原始编程与显式擦除)。
 
-新建 COMP 程序，从 FUNCTION → 右 → 1:NX → 2:ASM 插入 ASM，补上十进制基址 `598016`。用[键盘输入](#键盘输入)中的 OP、REG、SYM 菜单输入正文，再从 BLOCK 插入 ENDASM；最后两行按普通 BASIC 输入。
+新建 COMP 程序，从 FUNCTION → 1:EXT → 2:ASM 打开命令列表，选 `2:ASM`，查看说明后按 EXE 插入，补上十进制基址 `598016`。用[键盘输入](#键盘输入)中的 OP、REG、SYM 菜单输入正文，再从 BLOCK 插入 ENDASM；最后两行按普通 BASIC 输入。
 
 ```text
 ASM 598016
@@ -145,7 +175,7 @@ FLASHWRITE 和内联 ASM 对 `8:0000–F:FFFF` 执行原始 NOR 编程，包括�
 
 `CALL(20212,4)` 的擦除范围是整个银行 9，包含示例 `9:2000` 周围的全部原生库数据。确认整扇区可供删除、备份和恢复方法均已准备后再调用。
 
-旧 Hex／页面编程界面通过 S1/S2 journal 提交和恢复：S1 `8:4000–5FEF` 为数据，末 16 字节为元数据，S2 为备份。BASIC FLASHWRITE、ASM 使用原始编程，CALL 直接调用目标。混用时须保持恢复副本与当前 Flash 一致，防止旧副本覆盖新数据。
+Hex／汇编页面的 SAVE 通过 S1/S2 journal 提交和恢复：S1 `8:4000–5FEF` 为数据，末 16 字节为元数据，S2 为备份。BASIC FLASHWRITE、ASM 使用原始编程，CALL 直接调用目标。混用时须保持恢复副本与当前 Flash 一致，防止旧副本覆盖新数据。
 
 ### 按键与计时
 

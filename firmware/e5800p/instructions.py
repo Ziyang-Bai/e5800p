@@ -115,7 +115,7 @@ ISA_DATA_CATEGORY_ROW_1 = b'3:BR    4:LOADST\x00'
 
 ISA_DATA_CATEGORY_ROW_2 = b'5:STACK 6:MISC\x00'
 
-ISA_DATA_CATEGORY_TITLE = b'FUNCTION\x00'
+ISA_DATA_CATEGORY_TITLE = b'ASSEMBLE\x00'
 
 ISA_DATA_OPERAND_BAD_TEXT = b'BAD OPERAND\x00'
 
@@ -252,7 +252,7 @@ INSTRUCTION_NAMES_LABELS = {
     'instruction_names': 0x0,
 }
 
-VIEWER_DATA = b'DISAS MODE  HEX MODE\x00'
+VIEWER_DATA = b'DISASM EXE:ASM F:MENU\x00'
 
 VIEWER_DATA_LABELS = {
     'viewer_data': 0x0,
@@ -616,20 +616,10 @@ def install(fw):
         cpu.er8 = cpu.er0
         cpu.er10 = cpu.er2
         cpu.er12 = cpu.er4
-        cpu.sp += -32
-        cpu.sp += -32
-        cpu.sp += -32
+        cpu.sp += -96
         cpu.er14 = cpu.sp
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x22
-        cpu.mem8[cpu.er2] = cpu.r6
-        cpu.er2 += 0x01
-        cpu.mem8[cpu.er2] = cpu.r7
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x24
-        cpu.mem8[cpu.er2] = cpu.r8
-        cpu.er2 += 0x01
-        cpu.mem8[cpu.er2] = cpu.r9
+        cpu.mem16[cpu.offset(cpu.er14, 0x22)] = cpu.er6
+        cpu.mem16[cpu.offset(cpu.er14, 0x24)] = cpu.er8
         cpu.r0 = 0x00
         cpu.er2 = cpu.er14
         cpu.er2 += 0x26
@@ -662,14 +652,10 @@ def install(fw):
         cpu.jump('enc_operand')
         cpu.label('skip_4')
         cpu.r0 = cpu.mem8[0x08, cpu.er10]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x29
-        cpu.mem8[cpu.er2] = cpu.r0
+        cpu.mem8[cpu.offset(cpu.er14, 0x29)] = cpu.r0
         cpu.er10 += 0x02
         cpu.r0 = cpu.mem8[0x08, cpu.er10]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x2A
-        cpu.mem8[cpu.er2] = cpu.r0
+        cpu.mem8[cpu.offset(cpu.er14, 0x2A)] = cpu.r0
         cpu.er10 += 0x01
         cpu.r0 = cpu.mem8[0x08, cpu.er10]
         cpu.er2 = cpu.er14
@@ -749,23 +735,11 @@ def install(fw):
         cpu.r6 += 0x01
         cpu.jump('enc_fields')
         cpu.label('enc_fields_done')
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x20
-        cpu.r0 = cpu.mem8[cpu.er2]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x2D
-        cpu.mem8[cpu.er2] = cpu.r0
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x21
-        cpu.r0 = cpu.mem8[cpu.er2]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x2E
-        cpu.mem8[cpu.er2] = cpu.r0
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x29
-        cpu.r0 = cpu.mem8[cpu.er2]
+        cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, 0x40)]
+        cpu.mem8[cpu.offset(cpu.er14, 0x2D)] = cpu.r0
+        cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, 0x41)]
+        cpu.mem8[cpu.offset(cpu.er14, 0x2E)] = cpu.r0
+        cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, 0x29)]
         cpu.compare(cpu.r0, 0x03)
         if cpu.eq:
             cpu.branch('skip_16')
@@ -832,9 +806,7 @@ def install(fw):
         cpu.label('enc_assemble')
         cpu.call('assemble')
         cpu.r9 = 0x02
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x29
-        cpu.r0 = cpu.mem8[cpu.er2]
+        cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, 0x29)]
         cpu.compare(cpu.r0, 0x17)
         if cpu.eq:
             cpu.branch('skip_24')
@@ -877,9 +849,7 @@ def install(fw):
         cpu.label('enc_size_four')
         cpu.r9 = 0x04
         cpu.label('enc_segment')
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x29
-        cpu.r0 = cpu.mem8[cpu.er2]
+        cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, 0x29)]
         cpu.compare(cpu.r0, 0x08)
         if cpu.ge:
             cpu.branch('skip_31')
@@ -904,48 +874,21 @@ def install(fw):
             cpu.branch('skip_34')
         cpu.jump('enc_operand')
         cpu.label('skip_34')
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x37
-        cpu.r0 = cpu.mem8[cpu.er2]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x39
-        cpu.mem8[cpu.er2] = cpu.r0
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x36
-        cpu.r0 = cpu.mem8[cpu.er2]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x38
-        cpu.mem8[cpu.er2] = cpu.r0
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x35
-        cpu.r0 = cpu.mem8[cpu.er2]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x37
-        cpu.mem8[cpu.er2] = cpu.r0
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x34
-        cpu.r0 = cpu.mem8[cpu.er2]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x36
-        cpu.mem8[cpu.er2] = cpu.r0
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x27
-        cpu.r0 = cpu.mem8[cpu.er2]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x34
-        cpu.mem8[cpu.er2] = cpu.r0
+        cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, 0x37)]
+        cpu.mem8[cpu.offset(cpu.er14, 0x39)] = cpu.r0
+        cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, 0x36)]
+        cpu.mem8[cpu.offset(cpu.er14, 0x38)] = cpu.r0
+        cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, 0x35)]
+        cpu.mem8[cpu.offset(cpu.er14, 0x37)] = cpu.r0
+        cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, 0x34)]
+        cpu.mem8[cpu.offset(cpu.er14, 0x36)] = cpu.r0
+        cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, 0x47)]
+        cpu.mem8[cpu.offset(cpu.er14, 0x34)] = cpu.r0
         cpu.r0 = 0xE3
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x35
-        cpu.mem8[cpu.er2] = cpu.r0
+        cpu.mem8[cpu.offset(cpu.er14, 0x35)] = cpu.r0
         cpu.r9 += 0x02
         cpu.label('enc_copy')
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x24
-        cpu.r0 = cpu.mem8[cpu.er2]
-        cpu.er2 += 0x01
-        cpu.r1 = cpu.mem8[cpu.er2]
+        cpu.er0 = cpu.mem16[cpu.offset(cpu.er14, 0x24)]
         cpu.r2 = cpu.r9
         cpu.r3 = 0x00
         cpu.er0 += cpu.er2
@@ -959,9 +902,8 @@ def install(fw):
         cpu.label('enc_copy_ready')
         cpu.er2 = cpu.er14
         cpu.er2 += 0x22
-        cpu.r10 = cpu.mem8[cpu.er2]
+        cpu.er10 = cpu.mem16[cpu.er2]
         cpu.er2 += 0x01
-        cpu.r11 = cpu.mem8[cpu.er2]
         cpu.r5 = cpu.r9
         cpu.er8 = cpu.er14
         cpu.er8 += 0x34
@@ -993,9 +935,7 @@ def install(fw):
         cpu.r1 = 0x00
         cpu.r2 = 0x00
         cpu.label('enc_exit')
-        cpu.sp += 0x20
-        cpu.sp += 0x20
-        cpu.sp += 0x20
+        cpu.sp += 0x60
         cpu.pop(cpu.qr8)
         cpu.pop(cpu.xr4)
         cpu.pop(cpu.pc)
@@ -1035,14 +975,8 @@ def install(fw):
             cpu.branch('skip_37')
         cpu.jump('branch_odd')
         cpu.label('skip_37')
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x24
-        cpu.r0 = cpu.mem8[cpu.er2]
-        cpu.er2 += 0x01
-        cpu.r1 = cpu.mem8[cpu.er2]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x26
-        cpu.r6 = cpu.mem8[cpu.er2]
+        cpu.er0 = cpu.mem16[cpu.offset(cpu.er14, 0x24)]
+        cpu.r6 = cpu.mem8[cpu.offset(cpu.er14, 0x26)]
         cpu.r0 += cpu.r6
         cpu.add_carry(cpu.r1, 0x00)
         cpu.er0 += 0x02
@@ -1086,18 +1020,10 @@ def install(fw):
         cpu.pop(cpu.pc)
         cpu.label('assemble')
         cpu.push(cpu.lr)
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x2A
-        cpu.r0 = cpu.mem8[cpu.er2]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x34
-        cpu.mem8[cpu.er2] = cpu.r0
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x2F
-        cpu.r0 = cpu.mem8[cpu.er2]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x35
-        cpu.mem8[cpu.er2] = cpu.r0
+        cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, 0x2A)]
+        cpu.mem8[cpu.offset(cpu.er14, 0x34)] = cpu.r0
+        cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, 0x2F)]
+        cpu.mem8[cpu.offset(cpu.er14, 0x35)] = cpu.r0
         cpu.er2 = cpu.er14
         cpu.er2 += 0x29
         cpu.r6 = cpu.mem8[cpu.er2]
@@ -1228,12 +1154,8 @@ def install(fw):
         cpu.label('skip_65')
         cpu.jump('asm_done')
         cpu.label('asm_imm')
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x2D
-        cpu.r7 = cpu.mem8[cpu.er2]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x35
-        cpu.r0 = cpu.mem8[cpu.er2]
+        cpu.r7 = cpu.mem8[cpu.offset(cpu.er14, 0x2D)]
+        cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, 0x35)]
         cpu.r0 |= cpu.r7
         cpu.er2 = cpu.er14
         cpu.er2 += 0x35
@@ -1251,12 +1173,8 @@ def install(fw):
         cpu.label('asm_sub_imm')
         cpu.r0 = 0x01
         cpu.call('pack')
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x36
-        cpu.mem8[cpu.er2] = cpu.r0
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x2D
-        cpu.r7 = cpu.mem8[cpu.er2]
+        cpu.mem8[cpu.offset(cpu.er14, 0x36)] = cpu.r0
+        cpu.r7 = cpu.mem8[cpu.offset(cpu.er14, 0x2D)]
         cpu.compare(cpu.r7, 0x00)
         if cpu.eq:
             cpu.branch('skip_66')
@@ -1268,35 +1186,21 @@ def install(fw):
         cpu.r6 = 0x00
         cpu.label('sub_tmp_ready')
         cpu.r0 = 0x4E
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x34
-        cpu.mem8[cpu.er2] = cpu.r0
+        cpu.mem8[cpu.offset(cpu.er14, 0x34)] = cpu.r0
         cpu.r0 = cpu.r6
         cpu.r0 |= 0xF0
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x35
-        cpu.mem8[cpu.er2] = cpu.r0
+        cpu.mem8[cpu.offset(cpu.er14, 0x35)] = cpu.r0
         cpu.r0 = cpu.r6
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x37
-        cpu.mem8[cpu.er2] = cpu.r0
+        cpu.mem8[cpu.offset(cpu.er14, 0x37)] = cpu.r0
         cpu.r0 = cpu.r6
         cpu.r0 <<= 0x04
         cpu.r0 |= 0x08
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x38
-        cpu.mem8[cpu.er2] = cpu.r0
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x2D
-        cpu.r0 = cpu.mem8[cpu.er2]
+        cpu.mem8[cpu.offset(cpu.er14, 0x38)] = cpu.r0
+        cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, 0x2D)]
         cpu.r0 |= 0x80
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x39
-        cpu.mem8[cpu.er2] = cpu.r0
+        cpu.mem8[cpu.offset(cpu.er14, 0x39)] = cpu.r0
         cpu.r0 = 0x0E
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x3A
-        cpu.mem8[cpu.er2] = cpu.r0
+        cpu.mem8[cpu.offset(cpu.er14, 0x3A)] = cpu.r0
         cpu.r0 = cpu.r6
         cpu.r0 |= 0xF0
         cpu.er2 = cpu.er14
@@ -1305,12 +1209,8 @@ def install(fw):
         cpu.jump('asm_done')
         cpu.label('asm_pair')
         cpu.call('asm_dest')
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x2A
-        cpu.r7 = cpu.mem8[cpu.er2]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x2E
-        cpu.r0 = cpu.mem8[cpu.er2]
+        cpu.r7 = cpu.mem8[cpu.offset(cpu.er14, 0x2A)]
+        cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, 0x2E)]
         cpu.r0 <<= 0x04
         cpu.r7 |= cpu.r0
         cpu.er2 = cpu.er14
@@ -1328,12 +1228,8 @@ def install(fw):
         cpu.jump('asm_done')
         cpu.label('asm_shift')
         cpu.call('asm_dest')
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x2A
-        cpu.r7 = cpu.mem8[cpu.er2]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x2E
-        cpu.r0 = cpu.mem8[cpu.er2]
+        cpu.r7 = cpu.mem8[cpu.offset(cpu.er14, 0x2A)]
+        cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, 0x2E)]
         cpu.r0 <<= 0x04
         cpu.r7 |= cpu.r0
         cpu.er2 = cpu.er14
@@ -1342,12 +1238,8 @@ def install(fw):
         cpu.jump('asm_done')
         cpu.label('asm_er_r')
         cpu.call('asm_dest')
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x2A
-        cpu.r7 = cpu.mem8[cpu.er2]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x2E
-        cpu.r0 = cpu.mem8[cpu.er2]
+        cpu.r7 = cpu.mem8[cpu.offset(cpu.er14, 0x2A)]
+        cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, 0x2E)]
         cpu.r0 <<= 0x04
         cpu.r7 |= cpu.r0
         cpu.er2 = cpu.er14
@@ -1358,12 +1250,8 @@ def install(fw):
         cpu.call('asm_dest')
         cpu.jump('asm_done')
         cpu.label('asm_sp_er')
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x2A
-        cpu.r7 = cpu.mem8[cpu.er2]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x2D
-        cpu.r0 = cpu.mem8[cpu.er2]
+        cpu.r7 = cpu.mem8[cpu.offset(cpu.er14, 0x2A)]
+        cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, 0x2D)]
         cpu.r0 <<= 0x04
         cpu.r7 |= cpu.r0
         cpu.er2 = cpu.er14
@@ -1379,12 +1267,8 @@ def install(fw):
         cpu.jump('asm_word')
         cpu.label('asm_disp')
         cpu.call('asm_dest')
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x2A
-        cpu.r7 = cpu.mem8[cpu.er2]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x2E
-        cpu.r0 = cpu.mem8[cpu.er2]
+        cpu.r7 = cpu.mem8[cpu.offset(cpu.er14, 0x2A)]
+        cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, 0x2E)]
         cpu.r0 <<= 0x04
         cpu.r7 |= cpu.r0
         cpu.er2 = cpu.er14
@@ -1405,9 +1289,7 @@ def install(fw):
         cpu.mem8[cpu.er2] = cpu.r0
         cpu.jump('asm_done')
         cpu.label('asm_branch')
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x30
-        cpu.r0 = cpu.mem8[cpu.er2]
+        cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, 0x30)]
         cpu.er2 = cpu.er14
         cpu.er2 += 0x34
         cpu.mem8[cpu.er2] = cpu.r0
@@ -1416,10 +1298,7 @@ def install(fw):
         cpu.r0 = 0x00
         cpu.jump('asm_word')
         cpu.label('asm_sys')
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x20
-        cpu.r0 = cpu.mem8[cpu.er2]
+        cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, 0x40)]
         cpu.r0 |= 0xF0
         cpu.er2 = cpu.er14
         cpu.er2 += 0x35
@@ -1427,12 +1306,8 @@ def install(fw):
         cpu.r0 = 0x01
         cpu.jump('asm_word')
         cpu.label('asm_dest')
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x2D
-        cpu.r7 = cpu.mem8[cpu.er2]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x2F
-        cpu.r0 = cpu.mem8[cpu.er2]
+        cpu.r7 = cpu.mem8[cpu.offset(cpu.er14, 0x2D)]
+        cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, 0x2F)]
         cpu.r0 |= cpu.r7
         cpu.er2 = cpu.er14
         cpu.er2 += 0x35
@@ -1456,70 +1331,30 @@ def install(fw):
         cpu.er10 = cpu.er0
         cpu.r7 = cpu.r5
         cpu.er12 = cpu.er2
-        cpu.sp += -32
-        cpu.sp += -32
-        cpu.sp += -32
+        cpu.sp += -96
         cpu.er14 = cpu.sp
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.mem8[cpu.er2] = cpu.r10
-        cpu.er2 += 0x01
-        cpu.mem8[cpu.er2] = cpu.r11
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x22
-        cpu.mem8[cpu.er2] = cpu.r8
-        cpu.er2 += 0x01
-        cpu.mem8[cpu.er2] = cpu.r9
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x24
-        cpu.mem8[cpu.er2] = cpu.r12
-        cpu.er2 += 0x01
-        cpu.mem8[cpu.er2] = cpu.r13
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x26
-        cpu.mem8[cpu.er2] = cpu.r7
+        cpu.mem16[cpu.offset(cpu.er14, 0x20)] = cpu.er10
+        cpu.mem16[cpu.offset(cpu.er14, 0x22)] = cpu.er8
+        cpu.mem16[cpu.offset(cpu.er14, 0x24)] = cpu.er12
+        cpu.mem8[cpu.offset(cpu.er14, 0x26)] = cpu.r7
         cpu.r0 = 0x00
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x31
-        cpu.mem8[cpu.er2] = cpu.r0
+        cpu.mem8[cpu.offset(cpu.er14, 0x31)] = cpu.r0
         cpu.r0 = 0x00
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x2D
-        cpu.mem8[cpu.er2] = cpu.r0
+        cpu.mem8[cpu.offset(cpu.er14, 0x2D)] = cpu.r0
         cpu.r0 = 0x00
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x2E
-        cpu.mem8[cpu.er2] = cpu.r0
+        cpu.mem8[cpu.offset(cpu.er14, 0x2E)] = cpu.r0
         cpu.r0 = 0x00
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x20
-        cpu.mem8[cpu.er2] = cpu.r0
+        cpu.mem8[cpu.offset(cpu.er14, 0x40)] = cpu.r0
         cpu.r0 = 0x00
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x21
-        cpu.mem8[cpu.er2] = cpu.r0
+        cpu.mem8[cpu.offset(cpu.er14, 0x41)] = cpu.r0
         cpu.r0 = 0x00
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x22
-        cpu.mem8[cpu.er2] = cpu.r0
+        cpu.mem8[cpu.offset(cpu.er14, 0x42)] = cpu.r0
         cpu.r0 = 0x00
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x23
-        cpu.mem8[cpu.er2] = cpu.r0
+        cpu.mem8[cpu.offset(cpu.er14, 0x43)] = cpu.r0
         cpu.r0 = 0x00
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x24
-        cpu.mem8[cpu.er2] = cpu.r0
+        cpu.mem8[cpu.offset(cpu.er14, 0x44)] = cpu.r0
         cpu.r0 = 0x00
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x25
-        cpu.mem8[cpu.er2] = cpu.r0
+        cpu.mem8[cpu.offset(cpu.er14, 0x45)] = cpu.r0
         cpu.er2 = cpu.er14
         cpu.er2 += 0x26
         cpu.r0 = cpu.mem8[cpu.er2]
@@ -1555,9 +1390,7 @@ def install(fw):
         cpu.jump('skip_2')
         cpu.label('skip_5')
         cpu.r0 += 0xCF
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x27
-        cpu.mem8[cpu.er2] = cpu.r0
+        cpu.mem8[cpu.offset(cpu.er14, 0x27)] = cpu.r0
         cpu.r0 = 0x00
         cpu.er2 = cpu.er14
         cpu.er2 += 0x3C
@@ -1648,66 +1481,24 @@ def install(fw):
         cpu.jump('skip_13')
         cpu.label('selected')
         cpu.call('record')
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x29
-        cpu.r0 = cpu.mem8[cpu.er2]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x2A
-        cpu.r1 = cpu.mem8[cpu.er2]
+        cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, 0x29)]
+        cpu.r1 = cpu.mem8[cpu.offset(cpu.er14, 0x2A)]
         cpu.r0 = 0x00
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x31
-        cpu.mem8[cpu.er2] = cpu.r0
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x2D
-        cpu.mem8[cpu.er2] = cpu.r0
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x2E
-        cpu.mem8[cpu.er2] = cpu.r0
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x34
-        cpu.mem8[cpu.er2] = cpu.r0
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x35
-        cpu.mem8[cpu.er2] = cpu.r0
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x36
-        cpu.mem8[cpu.er2] = cpu.r0
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x37
-        cpu.mem8[cpu.er2] = cpu.r0
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x20
-        cpu.mem8[cpu.er2] = cpu.r0
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x21
-        cpu.mem8[cpu.er2] = cpu.r0
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x22
-        cpu.mem8[cpu.er2] = cpu.r0
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x23
-        cpu.mem8[cpu.er2] = cpu.r0
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x24
-        cpu.mem8[cpu.er2] = cpu.r0
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x25
-        cpu.mem8[cpu.er2] = cpu.r0
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x26
-        cpu.mem8[cpu.er2] = cpu.r0
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x27
-        cpu.mem8[cpu.er2] = cpu.r0
+        cpu.mem8[cpu.offset(cpu.er14, 0x31)] = cpu.r0
+        cpu.mem8[cpu.offset(cpu.er14, 0x2D)] = cpu.r0
+        cpu.mem8[cpu.offset(cpu.er14, 0x2E)] = cpu.r0
+        cpu.mem8[cpu.offset(cpu.er14, 0x34)] = cpu.r0
+        cpu.mem8[cpu.offset(cpu.er14, 0x35)] = cpu.r0
+        cpu.mem8[cpu.offset(cpu.er14, 0x36)] = cpu.r0
+        cpu.mem8[cpu.offset(cpu.er14, 0x37)] = cpu.r0
+        cpu.mem8[cpu.offset(cpu.er14, 0x40)] = cpu.r0
+        cpu.mem8[cpu.offset(cpu.er14, 0x41)] = cpu.r0
+        cpu.mem8[cpu.offset(cpu.er14, 0x42)] = cpu.r0
+        cpu.mem8[cpu.offset(cpu.er14, 0x43)] = cpu.r0
+        cpu.mem8[cpu.offset(cpu.er14, 0x44)] = cpu.r0
+        cpu.mem8[cpu.offset(cpu.er14, 0x45)] = cpu.r0
+        cpu.mem8[cpu.offset(cpu.er14, 0x46)] = cpu.r0
+        cpu.mem8[cpu.offset(cpu.er14, 0x47)] = cpu.r0
         cpu.r0 = 0xFF
         cpu.er2 = cpu.er14
         cpu.er2 += 0x20
@@ -1791,9 +1582,7 @@ def install(fw):
             cpu.branch('skip_25')
         cpu.jump('operand_key')
         cpu.label('skip_25')
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x31
-        cpu.r0 = cpu.mem8[cpu.er2]
+        cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, 0x31)]
         cpu.r0 += 0x01
         cpu.er2 = cpu.er14
         cpu.er2 += 0x31
@@ -1804,9 +1593,7 @@ def install(fw):
             cpu.branch('skip_26')
         cpu.jump('operand')
         cpu.label('skip_26')
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x31
-        cpu.r0 = cpu.mem8[cpu.er2]
+        cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, 0x31)]
         cpu.r0 += 0xFF
         cpu.er2 = cpu.er14
         cpu.er2 += 0x31
@@ -1837,9 +1624,7 @@ def install(fw):
         cpu.mem8[cpu.er2] = cpu.r0
         cpu.jump('operand')
         cpu.label('operand_next')
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x31
-        cpu.r0 = cpu.mem8[cpu.er2]
+        cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, 0x31)]
         cpu.r0 += 0x01
         cpu.er2 = cpu.er14
         cpu.er2 += 0x31
@@ -1961,28 +1746,18 @@ def install(fw):
             cpu.branch('skip_42')
         cpu.jump('bad_target_key')
         cpu.label('skip_42')
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x31
-        cpu.r0 = cpu.mem8[cpu.er2]
+        cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, 0x31)]
         cpu.r0 += 0xFF
         cpu.er2 = cpu.er14
         cpu.er2 += 0x31
         cpu.mem8[cpu.er2] = cpu.r0
         cpu.jump('operand')
         cpu.label('commit')
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x22
-        cpu.r8 = cpu.mem8[cpu.er2]
-        cpu.er2 += 0x01
-        cpu.r9 = cpu.mem8[cpu.er2]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x2B
-        cpu.r0 = cpu.mem8[cpu.er2]
+        cpu.er8 = cpu.mem16[cpu.offset(cpu.er14, 0x22)]
+        cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, 0x2B)]
         cpu.mem8[cpu.er8] = cpu.r0
         cpu.er8 += 0x01
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x2C
-        cpu.r0 = cpu.mem8[cpu.er2]
+        cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, 0x2C)]
         cpu.mem8[cpu.er8] = cpu.r0
         cpu.er8 += 0x01
         cpu.r7 = 0x08
@@ -2005,9 +1780,7 @@ def install(fw):
         cpu.r0 = 0xFF
         cpu.r1 = 0xFF
         cpu.label('exit')
-        cpu.sp += 0x20
-        cpu.sp += 0x20
-        cpu.sp += 0x20
+        cpu.sp += 0x60
         cpu.pop(cpu.er14)
         cpu.pop(cpu.er12)
         cpu.pop(cpu.qr8)
@@ -2033,15 +1806,11 @@ def install(fw):
         cpu.label('record')
         cpu.r0 = 0xE2
         cpu.r1 = 0x16
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x27
-        cpu.r6 = cpu.mem8[cpu.er2]
+        cpu.r6 = cpu.mem8[cpu.offset(cpu.er14, 0x27)]
         cpu.r7 = 0x00
         cpu.er0 += cpu.er6
         cpu.r6 = cpu.mem8[0x08, cpu.er0]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x28
-        cpu.r7 = cpu.mem8[cpu.er2]
+        cpu.r7 = cpu.mem8[cpu.offset(cpu.er14, 0x28)]
         cpu.r6 += cpu.r7
         cpu.r2 = cpu.r6
         cpu.r3 = 0x00
@@ -2050,52 +1819,29 @@ def install(fw):
         cpu.r0 = 0x3C
         cpu.r1 = 0x11
         cpu.er0 += cpu.er2
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x2E
-        cpu.mem8[cpu.er2] = cpu.r0
-        cpu.er2 += 0x01
-        cpu.mem8[cpu.er2] = cpu.r1
+        cpu.mem16[cpu.offset(cpu.er14, 0x4E)] = cpu.er0
         cpu.r6 = cpu.mem8[0x08, cpu.er0]
         cpu.er0 += 0x02
         cpu.r7 = cpu.mem8[0x08, cpu.er0]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x29
-        cpu.mem8[cpu.er2] = cpu.r6
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x2A
-        cpu.mem8[cpu.er2] = cpu.r7
+        cpu.mem8[cpu.offset(cpu.er14, 0x29)] = cpu.r6
+        cpu.mem8[cpu.offset(cpu.er14, 0x2A)] = cpu.r7
         cpu.er0 += 0x01
         cpu.r7 = cpu.mem8[0x08, cpu.er0]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x2F
-        cpu.mem8[cpu.er2] = cpu.r7
+        cpu.mem8[cpu.offset(cpu.er14, 0x2F)] = cpu.r7
         cpu.er0 += 0x09
         cpu.r6 = cpu.mem8[0x08, cpu.er0]
         cpu.er0 += 0x01
         cpu.r7 = cpu.mem8[0x08, cpu.er0]
         cpu.r0 = cpu.r6
         cpu.r1 = cpu.r7
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x30
-        cpu.mem8[cpu.er2] = cpu.r0
-        cpu.er2 += 0x01
-        cpu.mem8[cpu.er2] = cpu.r1
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x29
-        cpu.r0 = cpu.mem8[cpu.er2]
+        cpu.mem16[cpu.offset(cpu.er14, 0x50)] = cpu.er0
+        cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, 0x29)]
         cpu.er2 = cpu.er14
         cpu.er2 += 0x2A
         cpu.r1 = cpu.mem8[cpu.er2]
         cpu.ret()
         cpu.label('field_kind')
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x2E
-        cpu.r0 = cpu.mem8[cpu.er2]
-        cpu.er2 += 0x01
-        cpu.r1 = cpu.mem8[cpu.er2]
+        cpu.er0 = cpu.mem16[cpu.offset(cpu.er14, 0x4E)]
         cpu.er0 += 0x04
         cpu.er2 = cpu.er14
         cpu.er2 += 0x31
@@ -2155,9 +1901,7 @@ def install(fw):
         cpu.jump('set_invalid')
         cpu.label('skip_51')
         cpu.label('set_hex_check')
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x31
-        cpu.r6 = cpu.mem8[cpu.er2]
+        cpu.r6 = cpu.mem8[cpu.offset(cpu.er14, 0x31)]
         cpu.compare(cpu.r7, 0x04)
         if cpu.eq:
             cpu.branch('skip_52')
@@ -2256,17 +2000,13 @@ def install(fw):
         cpu.r0 = 0xFF
         cpu.ret()
         cpu.label('change_field')
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x32
-        cpu.r7 = cpu.mem8[cpu.er2]
+        cpu.r7 = cpu.mem8[cpu.offset(cpu.er14, 0x32)]
         cpu.compare(cpu.r7, 0x04)
         if cpu.ne:
             cpu.branch('skip_66')
         cpu.jump('change_hex')
         cpu.label('skip_66')
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x31
-        cpu.r6 = cpu.mem8[cpu.er2]
+        cpu.r6 = cpu.mem8[cpu.offset(cpu.er14, 0x31)]
         cpu.compare(cpu.r6, 0x00)
         if cpu.ne:
             cpu.branch('skip_67')
@@ -2278,18 +2018,14 @@ def install(fw):
         cpu.r6 = 0x2D
         cpu.jump('change_loaded')
         cpu.label('change_hex')
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x31
-        cpu.r6 = cpu.mem8[cpu.er2]
+        cpu.r6 = cpu.mem8[cpu.offset(cpu.er14, 0x31)]
         cpu.r6 += 0x40
         cpu.label('change_loaded')
         cpu.r7 = 0x00
         cpu.er2 = cpu.er14
         cpu.er2 += cpu.er6
         cpu.r0 = cpu.mem8[cpu.er2]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x32
-        cpu.r7 = cpu.mem8[cpu.er2]
+        cpu.r7 = cpu.mem8[cpu.offset(cpu.er14, 0x32)]
         cpu.compare(cpu.r7, 0x05)
         if cpu.eq:
             cpu.branch('skip_68')
@@ -2318,9 +2054,7 @@ def install(fw):
             cpu.branch('skip_71')
         cpu.jump('change_step_done')
         cpu.label('skip_71')
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x29
-        cpu.r7 = cpu.mem8[cpu.er2]
+        cpu.r7 = cpu.mem8[cpu.offset(cpu.er14, 0x29)]
         cpu.compare(cpu.r7, 0x0F)
         if cpu.eq:
             cpu.branch('skip_72')
@@ -2356,9 +2090,7 @@ def install(fw):
         cpu.label('change_step_even')
         cpu.r1 <<= 0x01
         cpu.label('change_step_done')
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x32
-        cpu.r7 = cpu.mem8[cpu.er2]
+        cpu.r7 = cpu.mem8[cpu.offset(cpu.er14, 0x32)]
         cpu.r0 += cpu.r1
         cpu.compare(cpu.r7, 0x03)
         if cpu.ne:
@@ -2381,9 +2113,7 @@ def install(fw):
         cpu.jump('change_qr')
         cpu.label('skip_81')
         cpu.r0 &= 0x0F
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x29
-        cpu.r7 = cpu.mem8[cpu.er2]
+        cpu.r7 = cpu.mem8[cpu.offset(cpu.er14, 0x29)]
         cpu.compare(cpu.r7, 0x03)
         if cpu.eq:
             cpu.branch('skip_82')
@@ -2453,11 +2183,7 @@ def install(fw):
         cpu.label('old_length')
         cpu.push(cpu.lr)
         cpu.push(cpu.xr4)
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.r0 = cpu.mem8[cpu.er2]
-        cpu.er2 += 0x01
-        cpu.r1 = cpu.mem8[cpu.er2]
+        cpu.er0 = cpu.mem16[cpu.offset(cpu.er14, 0x20)]
         cpu.er4 = cpu.er0
         cpu.er4 += 0x10
         cpu.er2 = cpu.er14
@@ -2472,14 +2198,8 @@ def install(fw):
             cpu.branch('skip_90')
         cpu.jump('old_length_done')
         cpu.label('skip_90')
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x24
-        cpu.r0 = cpu.mem8[cpu.er2]
-        cpu.er2 += 0x01
-        cpu.r1 = cpu.mem8[cpu.er2]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x26
-        cpu.r6 = cpu.mem8[cpu.er2]
+        cpu.er0 = cpu.mem16[cpu.offset(cpu.er14, 0x24)]
+        cpu.r6 = cpu.mem8[cpu.offset(cpu.er14, 0x26)]
         cpu.r7 = 0x00
         cpu.er0 += cpu.er6
         cpu.er2 = cpu.er0
@@ -2495,12 +2215,7 @@ def install(fw):
         cpu.pop(cpu.pc)
         cpu.label('assemble')
         cpu.push(cpu.lr)
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x2E
-        cpu.r0 = cpu.mem8[cpu.er2]
-        cpu.er2 += 0x01
-        cpu.r1 = cpu.mem8[cpu.er2]
+        cpu.er0 = cpu.mem16[cpu.offset(cpu.er14, 0x4E)]
         cpu.er0 += 0x04
         cpu.r0 = cpu.mem8[0x08, cpu.er0]
         cpu.compare(cpu.r0, 0x04)
@@ -2508,20 +2223,10 @@ def install(fw):
             cpu.branch('skip_92')
         cpu.jump('codec_nibble_0')
         cpu.label('skip_92')
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x2D
-        cpu.r0 = cpu.mem8[cpu.er2]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x20
-        cpu.mem8[cpu.er2] = cpu.r0
+        cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, 0x2D)]
+        cpu.mem8[cpu.offset(cpu.er14, 0x40)] = cpu.r0
         cpu.label('codec_nibble_0')
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x2E
-        cpu.r0 = cpu.mem8[cpu.er2]
-        cpu.er2 += 0x01
-        cpu.r1 = cpu.mem8[cpu.er2]
+        cpu.er0 = cpu.mem16[cpu.offset(cpu.er14, 0x4E)]
         cpu.er0 += 0x05
         cpu.r0 = cpu.mem8[0x08, cpu.er0]
         cpu.compare(cpu.r0, 0x04)
@@ -2529,56 +2234,24 @@ def install(fw):
             cpu.branch('skip_93')
         cpu.jump('codec_nibble_1')
         cpu.label('skip_93')
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x2E
-        cpu.r0 = cpu.mem8[cpu.er2]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x21
-        cpu.mem8[cpu.er2] = cpu.r0
+        cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, 0x2E)]
+        cpu.mem8[cpu.offset(cpu.er14, 0x41)] = cpu.r0
         cpu.label('codec_nibble_1')
         cpu.r0 = 0x00
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x34
-        cpu.mem8[cpu.er2] = cpu.r0
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x35
-        cpu.mem8[cpu.er2] = cpu.r0
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x36
-        cpu.mem8[cpu.er2] = cpu.r0
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x37
-        cpu.mem8[cpu.er2] = cpu.r0
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x38
-        cpu.mem8[cpu.er2] = cpu.r0
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x39
-        cpu.mem8[cpu.er2] = cpu.r0
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x3A
-        cpu.mem8[cpu.er2] = cpu.r0
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x3B
-        cpu.mem8[cpu.er2] = cpu.r0
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x24
-        cpu.r0 = cpu.mem8[cpu.er2]
-        cpu.er2 += 0x01
-        cpu.r1 = cpu.mem8[cpu.er2]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x26
-        cpu.r6 = cpu.mem8[cpu.er2]
+        cpu.mem8[cpu.offset(cpu.er14, 0x34)] = cpu.r0
+        cpu.mem8[cpu.offset(cpu.er14, 0x35)] = cpu.r0
+        cpu.mem8[cpu.offset(cpu.er14, 0x36)] = cpu.r0
+        cpu.mem8[cpu.offset(cpu.er14, 0x37)] = cpu.r0
+        cpu.mem8[cpu.offset(cpu.er14, 0x38)] = cpu.r0
+        cpu.mem8[cpu.offset(cpu.er14, 0x39)] = cpu.r0
+        cpu.mem8[cpu.offset(cpu.er14, 0x3A)] = cpu.r0
+        cpu.mem8[cpu.offset(cpu.er14, 0x3B)] = cpu.r0
+        cpu.er0 = cpu.mem16[cpu.offset(cpu.er14, 0x24)]
+        cpu.r6 = cpu.mem8[cpu.offset(cpu.er14, 0x26)]
         cpu.r7 = 0x00
         cpu.er0 += cpu.er6
         cpu.er8 = cpu.er0
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x2E
-        cpu.r0 = cpu.mem8[cpu.er2]
-        cpu.er2 += 0x01
-        cpu.r1 = cpu.mem8[cpu.er2]
+        cpu.er0 = cpu.mem16[cpu.offset(cpu.er14, 0x4E)]
         cpu.er2 = cpu.er0
         cpu.er4 = cpu.er14
         cpu.er4 += 0x20
@@ -2588,9 +2261,7 @@ def install(fw):
         cpu.er0 = cpu.er8
         cpu.call(CODEC_ENCODE_ADDRESS)
         cpu.r7 = cpu.r2
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x30
-        cpu.mem8[cpu.er2] = cpu.r0
+        cpu.mem8[cpu.offset(cpu.er14, 0x30)] = cpu.r0
         cpu.er2 = cpu.er14
         cpu.er2 += 0x2C
         cpu.mem8[cpu.er2] = cpu.r7
@@ -2644,30 +2315,16 @@ def install(fw):
         cpu.r0 = 0x08
         cpu.label('lcd_font')
         cpu.push(cpu.lr)
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x2C
-        cpu.mem8[cpu.er2] = cpu.r0
+        cpu.mem8[cpu.offset(cpu.er14, 0x4C)] = cpu.r0
         cpu.r0 = cpu.mem8[0x80A0]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x2A
-        cpu.mem8[cpu.er2] = cpu.r0
+        cpu.mem8[cpu.offset(cpu.er14, 0x4A)] = cpu.r0
         cpu.r0 = cpu.mem8[0x80A2]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x2B
-        cpu.mem8[cpu.er2] = cpu.r0
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x2C
-        cpu.r0 = cpu.mem8[cpu.er2]
+        cpu.mem8[cpu.offset(cpu.er14, 0x4B)] = cpu.r0
+        cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, 0x4C)]
         cpu.mem8[0x80A0] = cpu.r0
         cpu.r0 = 0x01
         cpu.mem8[0x80A2] = cpu.r0
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x33
-        cpu.mem8[cpu.er2] = cpu.r1
+        cpu.mem8[cpu.offset(cpu.er14, 0x33)] = cpu.r1
         cpu.r0 = 0x00
         cpu.er2 = cpu.er14
         cpu.er2 += 0x33
@@ -2676,10 +2333,7 @@ def install(fw):
         cpu.push(cpu.er4)
         cpu.call(ROM_DRAW_TEXT)
         cpu.pop(cpu.er4)
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x2B
-        cpu.r0 = cpu.mem8[cpu.er2]
+        cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, 0x4B)]
         cpu.mem8[0x80A2] = cpu.r0
         cpu.er2 = cpu.er14
         cpu.er2 += 0x20
@@ -2695,10 +2349,7 @@ def install(fw):
         cpu.label('show_font')
         cpu.push(cpu.lr)
         cpu.er8 = cpu.er2
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x2C
-        cpu.mem8[cpu.er2] = cpu.r0
+        cpu.mem8[cpu.offset(cpu.er14, 0x4C)] = cpu.r0
         cpu.er2 = cpu.er14
         cpu.er2 += 0x33
         cpu.mem8[cpu.er2] = cpu.r1
@@ -2706,9 +2357,7 @@ def install(fw):
         cpu.er2 = cpu.er8
         cpu.er6 = 0x11
         cpu.call(UI_TEXT_ADDRESS)
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x33
-        cpu.r1 = cpu.mem8[cpu.er2]
+        cpu.r1 = cpu.mem8[cpu.offset(cpu.er14, 0x33)]
         cpu.er2 = cpu.er14
         cpu.er2 += 0x20
         cpu.er2 += 0x2C
@@ -2743,14 +2392,8 @@ def install(fw):
         cpu.push(cpu.lr)
         cpu.er10 = cpu.er14
         cpu.call('old_length')
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x2B
-        cpu.mem8[cpu.er2] = cpu.r0
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x24
-        cpu.r0 = cpu.mem8[cpu.er2]
-        cpu.er2 += 0x01
-        cpu.r1 = cpu.mem8[cpu.er2]
+        cpu.mem8[cpu.offset(cpu.er14, 0x2B)] = cpu.r0
+        cpu.er0 = cpu.mem16[cpu.offset(cpu.er14, 0x24)]
         cpu.er2 = cpu.er14
         cpu.er2 += 0x26
         cpu.r6 = cpu.mem8[cpu.er2]
@@ -2775,11 +2418,7 @@ def install(fw):
             cpu.branch('skip_96')
         cpu.jump('skip_97')
         cpu.label('skip_96')
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.r0 = cpu.mem8[cpu.er2]
-        cpu.er2 += 0x01
-        cpu.r1 = cpu.mem8[cpu.er2]
+        cpu.er0 = cpu.mem16[cpu.offset(cpu.er14, 0x20)]
         cpu.er2 = cpu.er14
         cpu.er2 += 0x26
         cpu.r6 = cpu.mem8[cpu.er2]
@@ -2984,9 +2623,7 @@ def install(fw):
         cpu.call('old_line')
         cpu.call('name_line')
         cpu.er10 = cpu.er14
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x32
-        cpu.r7 = cpu.mem8[cpu.er2]
+        cpu.r7 = cpu.mem8[cpu.offset(cpu.er14, 0x32)]
         cpu.r0 = 0x52
         cpu.compare(cpu.r7, 0x02)
         if cpu.eq:
@@ -3008,9 +2645,7 @@ def install(fw):
         cpu.jump('operand_label')
         cpu.label('skip_104')
         cpu.r0 = 0x48
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x29
-        cpu.r7 = cpu.mem8[cpu.er2]
+        cpu.r7 = cpu.mem8[cpu.offset(cpu.er14, 0x29)]
         cpu.compare(cpu.r7, 0x0E)
         if cpu.eq:
             cpu.branch('skip_105')
@@ -3031,9 +2666,7 @@ def install(fw):
         cpu.r0 = 0x3D
         cpu.mem8[cpu.er10] = cpu.r0
         cpu.er10 += 0x01
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x32
-        cpu.r7 = cpu.mem8[cpu.er2]
+        cpu.r7 = cpu.mem8[cpu.offset(cpu.er14, 0x32)]
         cpu.compare(cpu.r7, 0x04)
         if cpu.ne:
             cpu.branch('skip_106')
@@ -3088,9 +2721,7 @@ def install(fw):
         cpu.call(0x0409A)
         cpu.call('old_line')
         cpu.call('name_line')
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x30
-        cpu.r0 = cpu.mem8[cpu.er2]
+        cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, 0x30)]
         cpu.compare(cpu.r0, 0x01)
         if cpu.eq:
             cpu.branch('skip_108')
@@ -3219,32 +2850,11 @@ def install(fw):
         cpu.label('entry')
         cpu.er12 = cpu.er0
         cpu.er8 = cpu.er2
-        cpu.sp += -32
-        cpu.sp += -32
-        cpu.sp += -32
+        cpu.sp += -96
         cpu.er14 = cpu.sp
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x28
-        cpu.mem8[cpu.er2] = cpu.r8
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x29
-        cpu.mem8[cpu.er2] = cpu.r9
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x20
-        cpu.mem8[cpu.er2] = cpu.r8
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x21
-        cpu.mem8[cpu.er2] = cpu.r9
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x22
-        cpu.mem8[cpu.er2] = cpu.r12
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x23
-        cpu.mem8[cpu.er2] = cpu.r13
+        cpu.mem16[cpu.offset(cpu.er14, 0x28)] = cpu.er8
+        cpu.mem16[cpu.offset(cpu.er14, 0x40)] = cpu.er8
+        cpu.mem16[cpu.offset(cpu.er14, 0x42)] = cpu.er12
         cpu.er2 = cpu.er14
         cpu.er2 += 0x20
         cpu.er2 += 0x25
@@ -3255,10 +2865,7 @@ def install(fw):
             cpu.branch('skip_1')
         cpu.jump('entry_invalid')
         cpu.label('skip_1')
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x24
-        cpu.mem8[cpu.er2] = cpu.r0
+        cpu.mem8[cpu.offset(cpu.er14, 0x44)] = cpu.r0
         cpu.er2 = cpu.er14
         cpu.er2 += 0x20
         cpu.er2 += 0x25
@@ -3279,32 +2886,12 @@ def install(fw):
         cpu.label('detail_draw')
         cpu.call('draw_detail')
         cpu.label('result')
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x20
-        cpu.r8 = cpu.mem8[cpu.er2]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x21
-        cpu.r9 = cpu.mem8[cpu.er2]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x28
-        cpu.mem8[cpu.er2] = cpu.r8
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x29
-        cpu.mem8[cpu.er2] = cpu.r9
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x24
-        cpu.r0 = cpu.mem8[cpu.er2]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x2A
-        cpu.mem8[cpu.er2] = cpu.r0
+        cpu.er8 = cpu.mem16[cpu.offset(cpu.er14, 0x40)]
+        cpu.mem16[cpu.offset(cpu.er14, 0x28)] = cpu.er8
+        cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, 0x44)]
+        cpu.mem8[cpu.offset(cpu.er14, 0x2A)] = cpu.r0
         cpu.r1 = 0x00
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x25
-        cpu.r6 = cpu.mem8[cpu.er2]
+        cpu.r6 = cpu.mem8[cpu.offset(cpu.er14, 0x45)]
         cpu.compare(cpu.r6, 0x01)
         if cpu.ne:
             cpu.branch('return_pc')
@@ -3332,9 +2919,7 @@ def install(fw):
         cpu.r9 = cpu.mem8[cpu.er2]
         cpu.er2 = cpu.er8
         cpu.label('exit')
-        cpu.sp += 0x20
-        cpu.sp += 0x20
-        cpu.sp += 0x20
+        cpu.sp += 0x60
         cpu.pop(cpu.er14)
         cpu.pop(cpu.er12)
         cpu.pop(cpu.qr8)
@@ -3342,9 +2927,7 @@ def install(fw):
         cpu.pop(cpu.pc)
         cpu.label('probe')
         cpu.push(cpu.lr)
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x28
-        cpu.r8 = cpu.mem8[cpu.er2]
+        cpu.r8 = cpu.mem8[cpu.offset(cpu.er14, 0x28)]
         cpu.er2 = cpu.er14
         cpu.er2 += 0x29
         cpu.r9 = cpu.mem8[cpu.er2]
@@ -3374,17 +2957,8 @@ def install(fw):
         cpu.label('skip_6')
         cpu.r6 = cpu.r2
         cpu.r7 = cpu.r3
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x2A
-        cpu.mem8[cpu.er2] = cpu.r0
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x2E
-        cpu.mem8[cpu.er2] = cpu.r6
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x2F
-        cpu.mem8[cpu.er2] = cpu.r7
+        cpu.mem8[cpu.offset(cpu.er14, 0x2A)] = cpu.r0
+        cpu.mem16[cpu.offset(cpu.er14, 0x4E)] = cpu.er6
         cpu.r7 = 0x00
         cpu.er8 += cpu.er6
         cpu.er2 = cpu.er8
@@ -3392,12 +2966,7 @@ def install(fw):
         cpu.er2 = cpu.er8
         cpu.er2 += 0x01
         cpu.r5 = cpu.mem8[0x08, cpu.er2]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x28
-        cpu.r8 = cpu.mem8[cpu.er2]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x29
-        cpu.r9 = cpu.mem8[cpu.er2]
+        cpu.er8 = cpu.mem16[cpu.offset(cpu.er14, 0x28)]
         cpu.er2 = cpu.er14
         cpu.er2 += 0x2A
         cpu.r0 = cpu.mem8[cpu.er2]
@@ -3415,19 +2984,10 @@ def install(fw):
         cpu.push(cpu.lr)
         cpu.r0 = 0xC3
         cpu.r1 = 0x93
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x2C
-        cpu.mem8[cpu.er2] = cpu.r0
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x2D
-        cpu.mem8[cpu.er2] = cpu.r1
+        cpu.mem16[cpu.offset(cpu.er14, 0x2C)] = cpu.er0
         cpu.r0 = 0xFF
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x2B
-        cpu.mem8[cpu.er2] = cpu.r0
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x2A
-        cpu.r0 = cpu.mem8[cpu.er2]
+        cpu.mem8[cpu.offset(cpu.er14, 0x2B)] = cpu.r0
+        cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, 0x2A)]
         cpu.compare(cpu.r0, 0x08)
         if cpu.eq:
             cpu.branch('skip_7')
@@ -3435,12 +2995,7 @@ def install(fw):
         cpu.label('skip_7')
         cpu.r0 = 0x46
         cpu.r1 = 0x91
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x2C
-        cpu.mem8[cpu.er2] = cpu.r0
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x2D
-        cpu.mem8[cpu.er2] = cpu.r1
+        cpu.mem16[cpu.offset(cpu.er14, 0x2C)] = cpu.er0
         cpu.r0 = 0x17
         cpu.er2 = cpu.er14
         cpu.er2 += 0x2B
@@ -3482,15 +3037,11 @@ def install(fw):
         cpu.er2 = cpu.er6
         cpu.er2 += 0x0C
         cpu.r0 = cpu.mem8[0x08, cpu.er2]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x2C
-        cpu.mem8[cpu.er2] = cpu.r0
+        cpu.mem8[cpu.offset(cpu.er14, 0x2C)] = cpu.r0
         cpu.er2 = cpu.er6
         cpu.er2 += 0x0D
         cpu.r0 = cpu.mem8[0x08, cpu.er2]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x2D
-        cpu.mem8[cpu.er2] = cpu.r0
+        cpu.mem8[cpu.offset(cpu.er14, 0x2D)] = cpu.r0
         cpu.er2 = cpu.er6
         cpu.r0 = cpu.mem8[0x08, cpu.er2]
         cpu.er2 = cpu.er14
@@ -3509,10 +3060,7 @@ def install(fw):
         cpu.pop(cpu.pc)
         cpu.label('normalize')
         cpu.push(cpu.lr)
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x22
-        cpu.r8 = cpu.mem8[cpu.er2]
+        cpu.r8 = cpu.mem8[cpu.offset(cpu.er14, 0x42)]
         cpu.er2 = cpu.er14
         cpu.er2 += 0x20
         cpu.er2 += 0x23
@@ -3539,40 +3087,16 @@ def install(fw):
         cpu.jump('top_reset')
         cpu.label('skip_11')
         cpu.label('top_scan')
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x22
-        cpu.r8 = cpu.mem8[cpu.er2]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x23
-        cpu.r9 = cpu.mem8[cpu.er2]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x28
-        cpu.mem8[cpu.er2] = cpu.r8
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x29
-        cpu.mem8[cpu.er2] = cpu.r9
+        cpu.er8 = cpu.mem16[cpu.offset(cpu.er14, 0x42)]
+        cpu.mem16[cpu.offset(cpu.er14, 0x28)] = cpu.er8
         cpu.r0 = 0x00
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x27
-        cpu.mem8[cpu.er2] = cpu.r0
+        cpu.mem8[cpu.offset(cpu.er14, 0x47)] = cpu.r0
         cpu.label('top_instruction')
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x28
-        cpu.r8 = cpu.mem8[cpu.er2]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x29
-        cpu.r9 = cpu.mem8[cpu.er2]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x20
-        cpu.r0 = cpu.mem8[cpu.er2]
+        cpu.er8 = cpu.mem16[cpu.offset(cpu.er14, 0x28)]
         cpu.er2 = cpu.er14
         cpu.er2 += 0x20
         cpu.er2 += 0x21
-        cpu.r1 = cpu.mem8[cpu.er2]
+        cpu.er0 = cpu.mem16[cpu.offset(cpu.er2, -1)]
         cpu.compare(cpu.er8, cpu.er0)
         if cpu.ne:
             cpu.branch('skip_12')
@@ -3588,88 +3112,35 @@ def install(fw):
             cpu.branch('skip_14')
         cpu.jump('top_reset')
         cpu.label('skip_14')
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x27
-        cpu.r0 = cpu.mem8[cpu.er2]
+        cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, 0x47)]
         cpu.compare(cpu.r0, 0x00)
         if cpu.ne:
             cpu.branch('top_advance')
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x2A
-        cpu.r0 = cpu.mem8[cpu.er2]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x26
-        cpu.mem8[cpu.er2] = cpu.r0
+        cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, 0x2A)]
+        cpu.mem8[cpu.offset(cpu.er14, 0x46)] = cpu.r0
         cpu.label('top_advance')
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x28
-        cpu.r8 = cpu.mem8[cpu.er2]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x29
-        cpu.r9 = cpu.mem8[cpu.er2]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x2A
-        cpu.r0 = cpu.mem8[cpu.er2]
+        cpu.er8 = cpu.mem16[cpu.offset(cpu.er14, 0x28)]
+        cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, 0x2A)]
         cpu.r1 = 0x00
         cpu.er8 += cpu.er0
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x28
-        cpu.mem8[cpu.er2] = cpu.r8
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x29
-        cpu.mem8[cpu.er2] = cpu.r9
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x27
-        cpu.r0 = cpu.mem8[cpu.er2]
+        cpu.mem16[cpu.offset(cpu.er14, 0x28)] = cpu.er8
+        cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, 0x47)]
         cpu.r0 += 0x01
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x27
-        cpu.mem8[cpu.er2] = cpu.r0
+        cpu.mem8[cpu.offset(cpu.er14, 0x47)] = cpu.r0
         cpu.compare(cpu.r0, 0x03)
         if cpu.ge:
             cpu.branch('skip_15')
         cpu.jump('top_instruction')
         cpu.label('skip_15')
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x22
-        cpu.r8 = cpu.mem8[cpu.er2]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x23
-        cpu.r9 = cpu.mem8[cpu.er2]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x26
-        cpu.r0 = cpu.mem8[cpu.er2]
+        cpu.er8 = cpu.mem16[cpu.offset(cpu.er14, 0x42)]
+        cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, 0x46)]
         cpu.r1 = 0x00
         cpu.er8 += cpu.er0
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x22
-        cpu.mem8[cpu.er2] = cpu.r8
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x23
-        cpu.mem8[cpu.er2] = cpu.r9
+        cpu.mem16[cpu.offset(cpu.er14, 0x42)] = cpu.er8
         cpu.jump('skip_11')
         cpu.label('top_reset')
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x20
-        cpu.r8 = cpu.mem8[cpu.er2]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x21
-        cpu.r9 = cpu.mem8[cpu.er2]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x22
-        cpu.mem8[cpu.er2] = cpu.r8
+        cpu.er8 = cpu.mem16[cpu.offset(cpu.er14, 0x40)]
+        cpu.mem8[cpu.offset(cpu.er14, 0x42)] = cpu.r8
         cpu.er2 = cpu.er14
         cpu.er2 += 0x20
         cpu.er2 += 0x23
@@ -3679,9 +3150,7 @@ def install(fw):
         cpu.label('draw_begin')
         cpu.push(cpu.lr)
         cpu.r0 = cpu.mem8[0x80A0]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x2F
-        cpu.mem8[cpu.er2] = cpu.r0
+        cpu.mem8[cpu.offset(cpu.er14, 0x2F)] = cpu.r0
         cpu.r0 = cpu.mem8[0x80A2]
         cpu.er2 = cpu.er14
         cpu.er2 += 0x30
@@ -3693,9 +3162,7 @@ def install(fw):
         cpu.label('draw_end')
         cpu.push(cpu.lr)
         cpu.call(ROM_REFRESH)
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x30
-        cpu.r0 = cpu.mem8[cpu.er2]
+        cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, 0x30)]
         cpu.mem8[0x80A2] = cpu.r0
         cpu.er2 = cpu.er14
         cpu.er2 += 0x2F
@@ -3711,10 +3178,10 @@ def install(fw):
         cpu.er0 = cpu.er2
         cpu.r2 = 0x44
         cpu.r3 = 0xF8
-        cpu.er6 = 0x15
+        cpu.er6 = 0x16
         cpu.call(UI_TEXT_ADDRESS)
         cpu.pop(cpu.er6)
-        cpu.er10 += 0x14
+        cpu.er10 += 0x15
         cpu.r0 = 0x00
         cpu.r0 = cpu.r0
         cpu.mem8[cpu.er10] = cpu.r0
@@ -3725,22 +3192,10 @@ def install(fw):
         cpu.call(SMALL_TEXT_ADDRESS)
         cpu.r8 = 0xEC
         cpu.r9 = 0x80
-        cpu.r6 = 0x05
+        cpu.r6 = 0x03
         cpu.call('reverse_rows')
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x22
-        cpu.r8 = cpu.mem8[cpu.er2]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x23
-        cpu.r9 = cpu.mem8[cpu.er2]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x28
-        cpu.mem8[cpu.er2] = cpu.r8
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x29
-        cpu.mem8[cpu.er2] = cpu.r9
+        cpu.er8 = cpu.mem16[cpu.offset(cpu.er14, 0x42)]
+        cpu.mem16[cpu.offset(cpu.er14, 0x28)] = cpu.er8
         cpu.r0 = 0x07
         cpu.er2 = cpu.er14
         cpu.er2 += 0x20
@@ -3754,20 +3209,8 @@ def install(fw):
         cpu.jump('skip_17')
         cpu.label('skip_16')
         cpu.call('decode')
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x28
-        cpu.r8 = cpu.mem8[cpu.er2]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x29
-        cpu.r9 = cpu.mem8[cpu.er2]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x20
-        cpu.r0 = cpu.mem8[cpu.er2]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x21
-        cpu.r1 = cpu.mem8[cpu.er2]
+        cpu.er8 = cpu.mem16[cpu.offset(cpu.er14, 0x28)]
+        cpu.er0 = cpu.mem16[cpu.offset(cpu.er14, 0x40)]
         cpu.compare(cpu.er8, cpu.er0)
         if cpu.ne:
             cpu.branch('row_not_selected')
@@ -3804,16 +3247,11 @@ def install(fw):
         cpu.r1 = cpu.mem8[cpu.er2]
         cpu.er2 = cpu.er14
         cpu.call(SMALL_TEXT_ADDRESS)
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x2A
-        cpu.r0 = cpu.mem8[cpu.er2]
+        cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, 0x2A)]
         cpu.r0 <<= 0x01
         cpu.r0 += 0x06
         cpu.r0 <<= 0x02
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x2B
-        cpu.mem8[cpu.er2] = cpu.r0
+        cpu.mem8[cpu.offset(cpu.er14, 0x4B)] = cpu.r0
         cpu.r0 >>= 0x02
         cpu.r1 = 0x18
         cpu.r1 -= cpu.r0
@@ -3827,10 +3265,7 @@ def install(fw):
         cpu.r0 = cpu.r0
         cpu.mem8[cpu.er10] = cpu.r0
         cpu.er10 += 0x01
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x2D
-        cpu.r0 = cpu.mem8[cpu.er2]
+        cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, 0x4D)]
         cpu.r1 = 0x00
         cpu.er8 = cpu.er14
         cpu.er8 += cpu.er0
@@ -3844,20 +3279,14 @@ def install(fw):
         cpu.r0 = 0x2B
         cpu.mem8[cpu.er8] = cpu.r0
         cpu.label('row_text')
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x2B
-        cpu.r0 = cpu.mem8[cpu.er2]
+        cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, 0x4B)]
         cpu.er2 = cpu.er14
         cpu.er2 += 0x20
         cpu.er2 += 0x2A
         cpu.r1 = cpu.mem8[cpu.er2]
         cpu.er2 = cpu.er14
         cpu.call(SMALL_TEXT_ADDRESS)
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x28
-        cpu.r0 = cpu.mem8[cpu.er2]
+        cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, 0x48)]
         cpu.compare(cpu.r0, 0x00)
         if cpu.eq:
             cpu.branch('row_next')
@@ -3884,27 +3313,12 @@ def install(fw):
         cpu.r6 = cpu.r0
         cpu.call('reverse_rows')
         cpu.label('row_next')
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x28
-        cpu.r8 = cpu.mem8[cpu.er2]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x29
-        cpu.r9 = cpu.mem8[cpu.er2]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x2A
-        cpu.r0 = cpu.mem8[cpu.er2]
+        cpu.er8 = cpu.mem16[cpu.offset(cpu.er14, 0x28)]
+        cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, 0x2A)]
         cpu.r1 = 0x00
         cpu.er8 += cpu.er0
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x28
-        cpu.mem8[cpu.er2] = cpu.r8
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x29
-        cpu.mem8[cpu.er2] = cpu.r9
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x2A
-        cpu.r0 = cpu.mem8[cpu.er2]
+        cpu.mem16[cpu.offset(cpu.er14, 0x28)] = cpu.er8
+        cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, 0x4A)]
         cpu.r0 += 0x06
         cpu.er2 = cpu.er14
         cpu.er2 += 0x20
@@ -3927,18 +3341,6 @@ def install(fw):
         cpu.r0 = 0x00
         cpu.r1 = 0x19
         cpu.call(ROM_DRAW_TEXT)
-        cpu.er10 = cpu.er14
-        cpu.r0 = 0x50
-        cpu.mem8[cpu.er10] = cpu.r0
-        cpu.er10 += 0x01
-        cpu.r0 = 0x00
-        cpu.r0 = cpu.r0
-        cpu.mem8[cpu.er10] = cpu.r0
-        cpu.er10 += 0x01
-        cpu.er2 = cpu.er14
-        cpu.r0 = 0x5A
-        cpu.r1 = 0x19
-        cpu.call(ROM_DRAW_TEXT)
         cpu.call('draw_end')
         cpu.pop(cpu.pc)
         cpu.label('draw_detail')
@@ -3955,29 +3357,17 @@ def install(fw):
         cpu.r0 = 0x00
         cpu.r1 = 0x01
         cpu.call(ROM_DRAW_TEXT)
-        cpu.er10 = cpu.er14
-        cpu.r0 = 0x50
-        cpu.mem8[cpu.er10] = cpu.r0
-        cpu.er10 += 0x01
-        cpu.r0 = 0x00
-        cpu.r0 = cpu.r0
-        cpu.mem8[cpu.er10] = cpu.r0
-        cpu.er10 += 0x01
+        cpu.push(cpu.xr4)
+        cpu.er0 = cpu.er14
+        cpu.call('fn_apps_copy_text')
+        cpu.data(b'DISASM\0\0')
+        cpu.pop(cpu.xr4)
         cpu.er2 = cpu.er14
-        cpu.r0 = 0x5A
+        cpu.r0 = 0x3C
         cpu.r1 = 0x01
         cpu.call(ROM_DRAW_TEXT)
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x20
-        cpu.r8 = cpu.mem8[cpu.er2]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x21
-        cpu.r9 = cpu.mem8[cpu.er2]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x28
-        cpu.mem8[cpu.er2] = cpu.r8
+        cpu.er8 = cpu.mem16[cpu.offset(cpu.er14, 0x40)]
+        cpu.mem8[cpu.offset(cpu.er14, 0x28)] = cpu.r8
         cpu.er2 = cpu.er14
         cpu.er2 += 0x29
         cpu.mem8[cpu.er2] = cpu.r9
@@ -3999,13 +3389,8 @@ def install(fw):
         cpu.r0 = cpu.r0
         cpu.mem8[cpu.er10] = cpu.r0
         cpu.er10 += 0x01
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x10
-        cpu.r0 = cpu.mem8[cpu.er2]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x30
-        cpu.mem8[cpu.er2] = cpu.r0
+        cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, 0x10)]
+        cpu.mem8[cpu.offset(cpu.er14, 0x50)] = cpu.r0
         cpu.r0 = 0x00
         cpu.er2 = cpu.er14
         cpu.er2 += 0x10
@@ -4014,13 +3399,8 @@ def install(fw):
         cpu.r0 = 0x00
         cpu.r1 = 0x11
         cpu.call(ROM_DRAW_TEXT)
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x30
-        cpu.r0 = cpu.mem8[cpu.er2]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x10
-        cpu.mem8[cpu.er2] = cpu.r0
+        cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, 0x50)]
+        cpu.mem8[cpu.offset(cpu.er14, 0x10)] = cpu.r0
         cpu.er2 = cpu.er14
         cpu.er2 += 0x10
         cpu.r0 = 0x00
@@ -4032,12 +3412,8 @@ def install(fw):
         cpu.push(cpu.lr)
         cpu.er2 = cpu.er14
         cpu.er2 += 0x20
-        cpu.er2 += 0x20
-        cpu.r8 = cpu.mem8[cpu.er2]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
         cpu.er2 += 0x21
-        cpu.r9 = cpu.mem8[cpu.er2]
+        cpu.er8 = cpu.mem16[cpu.offset(cpu.er2, -1)]
         cpu.er10 = cpu.er14
         cpu.r0 = 0x38
         cpu.mem8[cpu.er10] = cpu.r0
@@ -4052,12 +3428,7 @@ def install(fw):
         cpu.pop(cpu.pc)
         cpu.label('bytes')
         cpu.push(cpu.lr)
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x28
-        cpu.r8 = cpu.mem8[cpu.er2]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x29
-        cpu.r9 = cpu.mem8[cpu.er2]
+        cpu.er8 = cpu.mem16[cpu.offset(cpu.er14, 0x28)]
         cpu.r6 = 0x00
         cpu.label('byte')
         cpu.er2 = cpu.er8
@@ -4131,16 +3502,8 @@ def install(fw):
         cpu.ret()
         cpu.label('operand_text')
         cpu.push(cpu.lr)
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x28
-        cpu.r8 = cpu.mem8[cpu.er2]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x29
-        cpu.r9 = cpu.mem8[cpu.er2]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x20
-        cpu.er2 += 0x2E
-        cpu.r6 = cpu.mem8[cpu.er2]
+        cpu.er8 = cpu.mem16[cpu.offset(cpu.er14, 0x28)]
+        cpu.r6 = cpu.mem8[cpu.offset(cpu.er14, 0x4E)]
         cpu.r7 = 0x00
         cpu.er8 += cpu.er6
         cpu.er2 = cpu.er8
@@ -4148,36 +3511,20 @@ def install(fw):
         cpu.er2 = cpu.er8
         cpu.er2 += 0x01
         cpu.r5 = cpu.mem8[0x08, cpu.er2]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x34
-        cpu.mem8[cpu.er2] = cpu.r4
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x35
-        cpu.mem8[cpu.er2] = cpu.r5
+        cpu.mem16[cpu.offset(cpu.er14, 0x34)] = cpu.er4
         cpu.r0 = cpu.r5
         cpu.r0 &= 0x0F
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x36
-        cpu.mem8[cpu.er2] = cpu.r0
+        cpu.mem8[cpu.offset(cpu.er14, 0x36)] = cpu.r0
         cpu.r0 = cpu.r4
         cpu.r0 >>= 0x04
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x37
-        cpu.mem8[cpu.er2] = cpu.r0
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x2B
-        cpu.r0 = cpu.mem8[cpu.er2]
+        cpu.mem8[cpu.offset(cpu.er14, 0x37)] = cpu.r0
+        cpu.r0 = cpu.mem8[cpu.offset(cpu.er14, 0x2B)]
         cpu.compare(cpu.r0, 0xFF)
         if cpu.ne:
             cpu.branch('operand_skip_1')
         cpu.jump('operand_unknown')
         cpu.label('operand_skip_1')
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x2C
-        cpu.r6 = cpu.mem8[cpu.er2]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x2D
-        cpu.r7 = cpu.mem8[cpu.er2]
+        cpu.er6 = cpu.mem16[cpu.offset(cpu.er14, 0x2C)]
         cpu.label('operand_name')
         cpu.er2 = cpu.er6
         cpu.r0 = cpu.mem8[0x0F, cpu.er2]
@@ -4187,9 +3534,7 @@ def install(fw):
         cpu.compare(cpu.r0, 0x20)
         if cpu.ne:
             cpu.branch('operand_name_char')
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x2B
-        cpu.r1 = cpu.mem8[cpu.er2]
+        cpu.r1 = cpu.mem8[cpu.offset(cpu.er14, 0x2B)]
         cpu.compare(cpu.r1, 0x13)
         if cpu.ne:
             cpu.branch('operand_name_done')
@@ -4504,9 +3849,7 @@ def install(fw):
         cpu.er10 += 0x01
         cpu.jump('operand_done')
         cpu.label('operand_branch')
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x34
-        cpu.r6 = cpu.mem8[cpu.er2]
+        cpu.r6 = cpu.mem8[cpu.offset(cpu.er14, 0x34)]
         cpu.r7 = 0x00
         cpu.compare(cpu.r6, 0x80)
         if cpu.lt:
@@ -4632,9 +3975,7 @@ def install(fw):
         cpu.r0 = cpu.mem8[cpu.er2]
         cpu.call('hexbyte')
         cpu.label('operand_done')
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x28
-        cpu.r8 = cpu.mem8[cpu.er2]
+        cpu.r8 = cpu.mem8[cpu.offset(cpu.er14, 0x28)]
         cpu.er2 = cpu.er14
         cpu.er2 += 0x29
         cpu.r9 = cpu.mem8[cpu.er2]
@@ -4707,12 +4048,7 @@ def install(fw):
         cpu.compare(cpu.r0, 0x00)
         if cpu.eq:
             cpu.branch('operand_segment_done')
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x28
-        cpu.r6 = cpu.mem8[cpu.er2]
-        cpu.er2 = cpu.er14
-        cpu.er2 += 0x29
-        cpu.r7 = cpu.mem8[cpu.er2]
+        cpu.er6 = cpu.mem16[cpu.offset(cpu.er14, 0x28)]
         cpu.er2 = cpu.er6
         cpu.r4 = cpu.mem8[0x08, cpu.er2]
         cpu.er2 += 0x01

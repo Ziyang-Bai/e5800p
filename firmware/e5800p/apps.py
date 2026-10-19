@@ -650,7 +650,7 @@ def install(fw):
 
     @fw.function(native=True)
     def apps_message():
-        """ER0=near 64-byte screen; R2=1 not apps/2 bad/3 empty/4 changed/5 RAM."""
+        """ER0=64-byte screen; R2=1 not apps/2 bad/3 empty/4 changed/5 RAM/6 run."""
         cpu.push(cpu.lr)
         cpu.push(cpu.xr4)
         cpu.push(cpu.er8)
@@ -674,36 +674,58 @@ def install(fw):
             cpu.jump('bad')
         cpu.compare(cpu.r4, 3)
         if cpu.eq:
-            cpu.jump('empty')
+            cpu.jump('not_apps')
         cpu.compare(cpu.r4, 4)
         if cpu.eq:
             cpu.jump('modified')
+        cpu.compare(cpu.r4, 6)
+        if cpu.eq:
+            cpu.jump('run')
         cpu.call('fn_apps_copy_text')
-        cpu.data(b'MEMORY FULL\0')
-        cpu.jump('draw')
-        cpu.label('not_apps')
-        cpu.call('fn_apps_copy_text')
-        cpu.data(b'S4 NOT APPS\0')
-        cpu.jump('draw')
-        cpu.label('bad')
-        cpu.call('fn_apps_copy_text')
-        cpu.data(b'BAD APP DATA\0\0')
-        cpu.jump('draw')
-        cpu.label('empty')
-        cpu.call('fn_apps_copy_text')
-        cpu.data(b'NO APPS\0')
-        cpu.jump('draw')
-        cpu.label('modified')
-        cpu.call('fn_apps_copy_text')
-        cpu.data(b'APP MODIFIED\0\0')
+        cpu.data(b'NO APP RAM\0\0')
         cpu.er0 = cpu.er8
         cpu.er0 += 16
         cpu.call('fn_apps_copy_text')
-        cpu.data(b'1:RUN\0')
+        cpu.data(b'FREE PROG RAM\0')
+        cpu.jump('back')
+        cpu.label('not_apps')
+        cpu.call('fn_apps_copy_text')
+        cpu.data(b'NO APPS\0')
+        cpu.er0 = cpu.er8
+        cpu.er0 += 16
+        cpu.call('fn_apps_copy_text')
+        cpu.data(b'INSTALL VIA PC\0\0')
+        cpu.jump('toolchain')
+        cpu.label('bad')
+        cpu.call('fn_apps_copy_text')
+        cpu.data(b'BAD APP DATA\0\0')
+        cpu.er0 = cpu.er8
+        cpu.er0 += 16
+        cpu.call('fn_apps_copy_text')
+        cpu.data(b'RECOVER VIA PC\0\0')
+        cpu.label('toolchain')
         cpu.er0 = cpu.er8
         cpu.er0 += 32
         cpu.call('fn_apps_copy_text')
-        cpu.data(b'2:BACK\0\0')
+        cpu.data(b'TOOLCHAIN\0')
+        cpu.jump('back')
+        cpu.label('run')
+        cpu.call('fn_apps_copy_text')
+        cpu.data(b'RUN APP?\0\0')
+        cpu.jump('confirm')
+        cpu.label('modified')
+        cpu.call('fn_apps_copy_text')
+        cpu.data(b'APP MODIFIED\0\0')
+        cpu.label('confirm')
+        cpu.er0 = cpu.er8
+        cpu.er0 += 16
+        cpu.call('fn_apps_copy_text')
+        cpu.data(b'EXE:RUN\0')
+        cpu.label('back')
+        cpu.er0 = cpu.er8
+        cpu.er0 += 48
+        cpu.call('fn_apps_copy_text')
+        cpu.data(b'EXIT:BACK\0')
         cpu.label('draw')
         cpu.er0 = cpu.er8
         cpu.call('fn_apps_screen')
@@ -731,8 +753,27 @@ def install(fw):
         cpu.er0 = cpu.er8
         cpu.call('fn_apps_copy_text')
         cpu.data(b'RETURN \0')
-        cpu.er12 = cpu.er8
-        cpu.er12 += 7
+        cpu.er0 = cpu.er8
+        cpu.er0 += 7
+        cpu.er2 = cpu.er10
+        cpu.call('fn_apps_number')
+        cpu.er0 = cpu.er8
+        cpu.er0 += 48
+        cpu.call('fn_apps_copy_text')
+        cpu.data(b'EXE/EXIT:BACK\0')
+        cpu.er0 = cpu.er8
+        cpu.call('fn_apps_screen')
+        cpu.pop(cpu.qr8)
+        cpu.pop(cpu.xr4)
+        cpu.pop(cpu.pc)
+
+    @fw.function(native=True)
+    def apps_number():
+        """Append unsigned ER2 at near ER0; return ER0 at the terminating NUL."""
+        cpu.push(cpu.xr4)
+        cpu.push(cpu.qr8)
+        cpu.er10 = cpu.er2
+        cpu.er12 = cpu.er0
         cpu.er6 = 10000
         cpu.r4 = 0
         cpu.label('digit')
@@ -781,11 +822,31 @@ def install(fw):
         if cpu.eq:
             cpu.er6 = 1
             cpu.jump('digit')
-        cpu.er0 = cpu.er8
-        cpu.call('fn_apps_screen')
+        cpu.er0 = cpu.er12
+        cpu.r2 = 0
+        cpu.mem8[0, cpu.er0] = cpu.r2
         cpu.pop(cpu.qr8)
         cpu.pop(cpu.xr4)
-        cpu.pop(cpu.pc)
+        cpu.ret()
+
+    @fw.function(native=True)
+    def apps_page_number():
+        cpu.push(cpu.er4)
+        cpu.push(cpu.er6)
+        cpu.er6 = 3
+        cpu.er4 = 1
+        cpu.label('page')
+        cpu.compare(cpu.er2, cpu.er6)
+        if cpu.lt:
+            cpu.branch('done')
+        cpu.er2 += -3
+        cpu.er4 += 1
+        cpu.branch('page')
+        cpu.label('done')
+        cpu.er2 = cpu.er4
+        cpu.pop(cpu.er6)
+        cpu.pop(cpu.er4)
+        cpu.jump('fn_apps_number')
 
     @fw.function(native=True)
     def apps():
@@ -795,6 +856,12 @@ def install(fw):
         cpu.sp += -64
         cpu.sp += -16
         cpu.er14 = cpu.sp
+        cpu.er0 = cpu.mem16[0, 0x80A0]
+        cpu.mem16[0, cpu.offset(cpu.er14, 76)] = cpu.er0
+        cpu.r0 = cpu.mem8[0, 0x80A2]
+        cpu.mem8[0, cpu.offset(cpu.er14, 78)] = cpu.r0
+        cpu.r0 = 0
+        cpu.mem8[0, 0x80A1] = cpu.r0
         cpu.er0 = 0
         cpu.mem16[0, cpu.offset(cpu.er14, 64)] = cpu.er0
         cpu.label('reload')
@@ -828,10 +895,10 @@ def install(fw):
         cpu.er0 = cpu.mem16[0, cpu.offset(cpu.er14, 64)]
         cpu.r4 -= cpu.r0
         cpu.sub_carry(cpu.r5, cpu.r1)
-        cpu.er0 = 4
+        cpu.er0 = 3
         cpu.compare(cpu.er4, cpu.er0)
         if cpu.gt:
-            cpu.er4 = 4
+            cpu.er4 = 3
         cpu.mem16[0, cpu.offset(cpu.er14, 72)] = cpu.er4
         cpu.er2 = cpu.er14
         cpu.r0 = 0
@@ -842,7 +909,23 @@ def install(fw):
         cpu.r4 += 0xFF
         if cpu.ne:
             cpu.branch('clear')
+        cpu.er0 = cpu.er14
+        cpu.call('fn_apps_copy_text')
+        cpu.data(b'APPS \0')
+        cpu.er0 = cpu.er14
+        cpu.er0 += 5
+        cpu.er2 = cpu.mem16[0, cpu.offset(cpu.er14, 64)]
+        cpu.call('fn_apps_page_number')
+        cpu.r2 = 0x2F
+        cpu.mem8[0, cpu.er0] = cpu.r2
+        cpu.er0 += 1
+        cpu.er2 = cpu.mem16[0, cpu.offset(cpu.er14, 68)]
+        cpu.er2 += -1
+        cpu.call('fn_apps_page_number')
+        cpu.call('fn_apps_copy_text')
+        cpu.data(b' <>\0')
         cpu.er10 = cpu.er14
+        cpu.er10 += 16
         cpu.er12 = cpu.mem16[0, cpu.offset(cpu.er14, 72)]
         cpu.r4 = 0x31
         cpu.label('row')
@@ -884,7 +967,7 @@ def install(fw):
         cpu.compare(cpu.r0, 0x31)
         if cpu.lt:
             cpu.jump('key')
-        cpu.compare(cpu.r0, 0x34)
+        cpu.compare(cpu.r0, 0x33)
         if cpu.gt:
             cpu.jump('key')
         cpu.r0 += 0xCF
@@ -906,20 +989,17 @@ def install(fw):
         cpu.mem16[0, cpu.offset(cpu.er14, 74)] = cpu.er8
         cpu.er0 = cpu.er8
         cpu.call('fn_apps_modified')
+        cpu.r2 = 4
         cpu.er0 = cpu.er0
         if cpu.eq:
-            cpu.jump('run')
+            cpu.r2 = 6
         cpu.er0 = cpu.er14
-        cpu.r2 = 4
         cpu.call('fn_apps_message')
         cpu.label('modified_key')
         cpu.call(SCANNER_ADDRESS)
-        cpu.compare(cpu.r0, 0x31)
+        cpu.compare(cpu.r0, 0xFB)
         if cpu.eq:
             cpu.branch('run')
-        cpu.compare(cpu.r0, 0x32)
-        if cpu.eq:
-            cpu.jump('reload')
         cpu.compare(cpu.r0, 0xFA)
         if cpu.eq:
             cpu.jump('reload')
@@ -950,12 +1030,12 @@ def install(fw):
         cpu.er0 = cpu.er0
         if cpu.eq:
             cpu.jump('key')
-        cpu.er0 += -4
+        cpu.er0 += -3
         cpu.mem16[0, cpu.offset(cpu.er14, 64)] = cpu.er0
         cpu.jump('reload')
         cpu.label('right')
         cpu.er0 = cpu.mem16[0, cpu.offset(cpu.er14, 64)]
-        cpu.er0 += 4
+        cpu.er0 += 3
         cpu.er2 = cpu.mem16[0, cpu.offset(cpu.er14, 68)]
         cpu.compare(cpu.er0, cpu.er2)
         if cpu.ge:
@@ -971,6 +1051,10 @@ def install(fw):
         if cpu.ne:
             cpu.branch('error_key')
         cpu.label('out')
+        cpu.er0 = cpu.mem16[0, cpu.offset(cpu.er14, 76)]
+        cpu.mem16[0, 0x80A0] = cpu.er0
+        cpu.r0 = cpu.mem8[0, cpu.offset(cpu.er14, 78)]
+        cpu.mem8[0, 0x80A2] = cpu.r0
         cpu.sp += 64
         cpu.sp += 16
         cpu.pop(cpu.qr8)

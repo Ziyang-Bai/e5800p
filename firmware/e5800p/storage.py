@@ -1005,8 +1005,7 @@ def install(fw):
         cpu.label('near_61')
         cpu.er0 = cpu.mem16[cpu.offset(cpu.er14, 0x000C)]
         cpu.er2 = cpu.mem16[cpu.offset(cpu.er14, 0x0004)]
-        cpu.r4 = 0x02
-        cpu.r5 = 0x71
+        cpu.er4 = cpu.address('fn_basic_flash__ram_reader') & 0xFFFF
         cpu.er6 = cpu.er14
         cpu.er8 = cpu.mem16[cpu.offset(cpu.er14, 0x000E)]
         cpu.call('basic_flash')

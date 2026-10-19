@@ -75,6 +75,8 @@ def install(fw):
         cpu.push(cpu.lr)
         cpu.push(cpu.xr4)
         cpu.push(cpu.qr8)
+        # ER6 is an optional bank-0 caption, outside the native edit frame.
+        cpu.push(cpu.er6)
         cpu.er8 = cpu.er0
         cpu.r10 = cpu.r2
         cpu.sp += -44
@@ -137,6 +139,14 @@ def install(fw):
         cpu.call(0x0409A)
         cpu.er0 = cpu.er14
         cpu.call(0xCBF98)
+        cpu.er2 = cpu.mem16[0, cpu.offset(cpu.er14, 44)]
+        cpu.er2 = cpu.er2
+        if cpu.eq:
+            cpu.branch('caption_done')
+        cpu.r0 = 0
+        cpu.r1 = 25
+        cpu.call(0x041DA)
+        cpu.label('caption_done')
         cpu.call(0x043BE)
         cpu.er0 = cpu.er14
         cpu.er0 += 6
@@ -223,6 +233,7 @@ def install(fw):
         cpu.er0 = 0x72A2
         cpu.r2 = 4
         cpu.sp += 44
+        cpu.pop(cpu.er6)
         cpu.pop(cpu.qr8)
         cpu.pop(cpu.xr4)
         cpu.pop(cpu.pc)
@@ -238,6 +249,7 @@ def install(fw):
         cpu.call('fn_graph_formula_get')
         cpu.er0 = cpu.mem16[0, cpu.er14]
         cpu.r2 = cpu.mem8[0, cpu.offset(cpu.er14, 2)]
+        cpu.er6 = 0
         cpu.call('fn_graph_input_tokens')
         cpu.compare(cpu.r3, 0)
         if cpu.eq:
@@ -285,13 +297,15 @@ def install(fw):
         cpu.push(cpu.qr8)
         cpu.er8 = cpu.er0
         cpu.r10 = cpu.r2
+        cpu.er12 = cpu.er4
         cpu.sp += -32
         cpu.er14 = cpu.sp
         cpu.er0 = cpu.mem16[0, 0x8086]
         cpu.mem16[0, cpu.offset(cpu.er14, 6)] = cpu.er0
-        cpu.label('edit')
         cpu.er0 = 0
         cpu.r2 = 0
+        cpu.label('edit')
+        cpu.er6 = cpu.er12
         cpu.call('fn_graph_input_tokens')
         cpu.compare(cpu.r3, 0)
         if cpu.eq:
@@ -325,14 +339,14 @@ def install(fw):
         cpu.sp += 10
         cpu.compare(cpu.r0, 1)
         if cpu.ne:
-            cpu.branch('edit')
+            cpu.branch('retry')
         cpu.er0 = cpu.er14
         cpu.er0 += 12
         cpu.r2 = 0
         cpu.call('fn_graph_scalar')
         cpu.compare(cpu.r0, 0)
         if cpu.ne:
-            cpu.branch('edit')
+            cpu.branch('retry')
         cpu.er0 = cpu.er14
         cpu.er0 += 12
         cpu.r2 = 0
@@ -342,6 +356,18 @@ def install(fw):
         cpu.call('fn_graph_copy')
         cpu.r0 = 1
         cpu.branch('out')
+        cpu.label('retry')
+        cpu.er0 = 4
+        cpu.push(cpu.er0)
+        cpu.er0 = 0x72A2
+        cpu.push(cpu.er0)
+        cpu.er0 = 0x73A2
+        cpu.r2 = 4
+        cpu.call(0x108CA)
+        cpu.sp += 4
+        cpu.er0 = 0x73A2
+        cpu.r2 = 4
+        cpu.branch('edit')
         cpu.label('cancel')
         cpu.r0 = 0
         cpu.label('out')
@@ -361,6 +387,7 @@ def install(fw):
         cpu.er10 = cpu.er2
         cpu.er0 = 0
         cpu.r2 = 0
+        cpu.er6 = 0
         cpu.call('fn_graph_input_tokens')
         cpu.compare(cpu.r3, 0)
         if cpu.eq:

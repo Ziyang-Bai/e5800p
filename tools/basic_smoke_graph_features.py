@@ -197,7 +197,9 @@ def _cursor_cases(emu, out, symbols, record):
     def menu(digit, target):
         _until(emu, symbols['graph_menu'], (0x17,))
         _until(emu, 0x80800)
-        _until(emu, symbols[target], (DIGITS[digit],))
+        for _ in range((digit - 1) // 3):
+            _until(emu, 0x80800, (0x57,))
+        _until(emu, symbols[target], (DIGITS[(digit - 1) % 3 + 1],))
         _until(emu, 0x80800)
 
     def point(item, key, axis, expected):
@@ -250,7 +252,7 @@ def _cursor_cases(emu, out, symbols, record):
     observations.append(item)
     assert state[3] == 0 and scalar_decimal(state[4:24]) == 100, item
     _until(emu, 0x80800)
-    _until(emu, symbols['graph_plot'], (0x26,))
+    _until(emu, symbols['graph_plot'], (0x63,))
     _until(emu, 0x80800, seconds=180)
     frame, _, _ = _descriptor(emu, emu.registers())
     item['cursor'] = list(emu.memory(frame + 134, 2))
@@ -281,10 +283,10 @@ def _sketch_case(emu, out, symbols, record):
         for _ in range(count):
             kind = payload[pos]
             size = int.from_bytes(payload[pos + 1:pos + 3], 'little')
-            assert kind in range(1, 6) and 3 <= size <= length - pos, (name, pos, size)
+            assert kind in range(1, 7) and 3 <= size <= length - pos, (name, pos, size)
             raw = payload[pos:pos + size]
-            start = 5 if kind == 5 else 3
-            points = int.from_bytes(raw[3:5], 'little') if kind == 5 else (2 if kind in (2, 3) else 1)
+            start = 5 if kind in (5, 6) else 3
+            points = int.from_bytes(raw[3:5], 'little') if kind in (5, 6) else (2 if kind in (2, 3) else 1)
             assert size >= start + points * 40, (name, raw.hex())
             if kind != 4:
                 assert size == start + points * 40, (name, raw.hex())
@@ -311,12 +313,13 @@ def _sketch_case(emu, out, symbols, record):
         out.joinpath('graph-sketch-' + name + '-frame.bin').write_bytes(emu.memory(0x80e0, 384))
         return item, window
 
-    def menu(more=False):
+    def menu(page=0):
         _until(emu, symbols['graph_menu'], (0x17,))
         _until(emu, 0x80800)
-        _until(emu, symbols['graph_sketch'], (DIGITS[4],))
+        _until(emu, 0x80800, (0x57,))
+        _until(emu, symbols['graph_sketch'], (DIGITS[1],))
         _until(emu, 0x80800)
-        if more:
+        for _ in range(page):
             _until(emu, 0x80800, (0x57,))
 
     def redraw(keys=()):
@@ -342,8 +345,8 @@ def _sketch_case(emu, out, symbols, record):
 
     observe('before-clear', None)
     # Start from an empty sketch through the same confirmation used below.
-    menu(True)
-    _until(emu, symbols['graph_clear_sketch'], (DIGITS[3],))
+    menu(2)
+    _until(emu, symbols['graph_clear_sketch'], (DIGITS[1],))
     _until(emu, 0x80800)
     redraw((0x63,))
     empty, _ = observe('empty', [])
@@ -394,7 +397,10 @@ def _sketch_case(emu, out, symbols, record):
     _until(emu, symbols['graph_mode_select'], (0x26,))
     _until(emu, 0x80800)
     _until(emu, symbols['graph'], (DIGITS[1],))
-    redraw()
+    _until(emu, 0x80800)
+    _until(emu, symbols['graph_menu'], (0x17,))
+    _until(emu, 0x80800, seconds=180)
+    redraw((0x26,))
     reopened, _ = observe('odd-reentry', [1])
     assert reopened['objects'][0]['raw'] == anchor and reopened['length'] == 131, reopened
     record['steps'].append('EXIT and GRAPH reentry accept the odd 131-byte EGS1 object')
@@ -402,8 +408,8 @@ def _sketch_case(emu, out, symbols, record):
     for digit, name, positions in ((2, 'line', [(30, 8), (35, 11)]),
                                     (3, 'rectangle', [(65, 18), (70, 21)]),
                                     (4, 'text', [(20, 5)])):
-        menu()
-        _until(emu, symbols['graph_pick'], (DIGITS[digit],), seconds=180)
+        menu((digit - 1) // 3)
+        _until(emu, symbols['graph_pick'], (DIGITS[(digit - 1) % 3 + 1],), seconds=180)
         _until(emu, 0x80800, seconds=180)
         for index, position in enumerate(positions):
             if index:
@@ -421,30 +427,61 @@ def _sketch_case(emu, out, symbols, record):
         if digit == 4:
             assert item['objects'][-1]['text'] == 'AB', item
     before_pen = item
-    menu(True)
-    _until(emu, symbols['graph_plot'], (DIGITS[1],))
-    _until(emu, 0x80800, seconds=180)
-    pick(21, 5)
+    before_pen_pixels = emu.memory(0x80e0, 384)
+    menu(1)
+    _until(emu, symbols['graph_pen_help'], (DIGITS[2],))
+    _until(emu, 0x80800)
+    _until(emu, symbols['graph_plot'], (0x63,))
+    _until(emu, symbols['graph_stage_point'], seconds=180)
     _until(emu, 0x80800)
     for key in (0x57, 0x47):
         _until(emu, symbols['graph_stage_point'], (key,))
         _until(emu, 0x80800)
-    _until(emu, symbols['graph_append'], (0x26,))
+    redraw((0x26,))
+    cancelled, _ = observe('pen-cancel', [1, 2, 3, 4])
+    assert cancelled['objects'] == before_pen['objects'] and cancelled['length'] == before_pen['length'], cancelled
+
+    menu(1)
+    _until(emu, symbols['graph_pen_help'], (DIGITS[2],))
+    _until(emu, 0x80800)
+    _until(emu, symbols['graph_plot'], (0x63,))
+    _until(emu, symbols['graph_stage_point'], seconds=180)
+    _until(emu, 0x80800)
+    for key in (0x57, 0x47, 0x63):
+        _until(emu, symbols['graph_stage_point'], (key,))
+        _until(emu, 0x80800)
+    for key in (0x57,) * 8 + (0x47,) * 17:
+        _until(emu, 0x80800, (key,))
+    for key in (0x63, 0x57):
+        _until(emu, symbols['graph_stage_point'], (key,))
+        _until(emu, 0x80800)
+    _until(emu, symbols['graph_pen_menu'], (0x17,))
+    _until(emu, 0x80800)
+    _until(emu, symbols['graph_pen_commit'], (DIGITS[1],))
+    _until(emu, symbols['graph_append'])
     redraw()
-    stroke, _ = observe('pen-three-points', [1, 2, 3, 4, 5])
-    coordinates(stroke['objects'][-1], [(21, 5), (22, 5), (22, 6)])
-    assert stroke['objects'][-1]['size'] == 125, stroke
-    menu(True)
-    _until(emu, symbols['graph_undo'], (DIGITS[2],))
+    stroke, _ = observe('pen-disconnected', [1, 2, 3, 4, 6])
+    coordinates(stroke['objects'][-1], [(21, 6), (22, 6), (22, 7), (22, 7), (30, 24), (31, 24)])
+    assert stroke['objects'][-1]['size'] == 245, stroke
+    pixels = emu.memory(0x80e0, 384)
+    stroke['segment_hits'] = [(x, y) for x in range(29, 33) for y in range(23, 26)
+                              if pixels[(y + 1) * 12 + x // 8] & (0x80 >> (x % 8))
+                              and not before_pen_pixels[(y + 1) * 12 + x // 8] & (0x80 >> (x % 8))]
+    assert stroke['segment_hits'], stroke
+    stroke['lift_bridge'] = [(x, y) for x in range(24, 29) for y in range(16, 21)
+                             if pixels[(y + 1) * 12 + x // 8] & (0x80 >> (x % 8))]
+    assert not stroke['lift_bridge'], ('PEN joined lifted segments', stroke['lift_bridge'])
+    menu(1)
+    _until(emu, symbols['graph_undo'], (DIGITS[3],))
     redraw()
     undone, _ = observe('undo-stroke', [1, 2, 3, 4])
     assert undone['objects'] == before_pen['objects'] and undone['length'] == before_pen['length'], undone
-    record['steps'].append('LINE, RECT, ASCII AB and three-point PEN stored in world coordinates; UNDO removes the whole stroke')
+    record['steps'].append('LINE, RECT and ASCII AB keep world coordinates; PEN EXIT cancels staged points, FUNCTION DONE stores disconnected segments, and UNDO removes the whole session')
 
     for key, name, kinds in ((0x26, 'clear-cancel', [1, 2, 3, 4]),
                              (0x63, 'clear-confirm', [])):
-        menu(True)
-        _until(emu, symbols['graph_clear_sketch'], (DIGITS[3],))
+        menu(2)
+        _until(emu, symbols['graph_clear_sketch'], (DIGITS[1],))
         _until(emu, 0x80800)
         redraw((key,))
         item, _ = observe(name, kinds)
@@ -458,7 +495,8 @@ def _sketch_case(emu, out, symbols, record):
     _until(emu, 0x80800)
     _until(emu, symbols['graph_calculate'], (DIGITS[2],))
     _until(emu, 0x80800)
-    _until(emu, symbols['graph_input_slot'], (DIGITS[4],))
+    _until(emu, 0x80800, (0x57,))
+    _until(emu, symbols['graph_input_slot'], (DIGITS[1],))
     _until(emu, 0x12576)
     _until(emu, symbols['graph_calc'], (0x70, DIGITS[2], 0x63))
     _until(emu, symbols['graph_wait'], seconds=300)
@@ -466,7 +504,7 @@ def _sketch_case(emu, out, symbols, record):
     record['slope'] = dict(x=str(scalar_decimal(state[4:24])),
                            y=str(scalar_decimal(state[24:44])), status=state[3])
     assert state[3] == 0 and scalar_decimal(state[4:24]) == 2 and scalar_decimal(state[24:44]) == 4, record['slope']
-    _until(emu, symbols['graph_tangent'], (0x26,))
+    _until(emu, symbols['graph_tangent'], (0x63,))
     _until(emu, 0x80800)
     _until(emu, symbols['graph_append'], (0x63,))
     redraw()
@@ -475,8 +513,8 @@ def _sketch_case(emu, out, symbols, record):
     assert all(abs(actual - expected) < Decimal('1e-8')
                for point, pair in zip(points, ((-10, -44), (10, 36)))
                for actual, expected in zip(point, pair)), item
-    menu(True)
-    _until(emu, symbols['graph_undo'], (DIGITS[2],))
+    menu(1)
+    _until(emu, symbols['graph_undo'], (DIGITS[3],))
     redraw()
     observe('undo-tangent', [])
     record['steps'].append('SLOPE at X 2 gives 4; confirmed tangent is the world-coordinate line Y=4X-4 and UNDO removes it')
@@ -542,10 +580,9 @@ def _ui_case(emu, out, symbols):
         out.joinpath('graph-selector-frame.bin').write_bytes(emu.memory(0x80e0, 384))
         record['steps'].append('MODE 7 selector')
         _until(emu, symbols['graph'], (DIGITS[1],))
-        pc, _ = _until(emu, (0x12576, 0x80800), seconds=180)
-        if pc == 0x80800:
-            _until(emu, symbols['graph_input_tokens'], (0x63,))
-            _until(emu, 0x12576)
+        _until(emu, 0x80800)
+        _until(emu, symbols['graph_input_tokens'], (0x63,))
+        _until(emu, 0x12576)
         # The native editor receives real Math-input X-square keystrokes.
         _until(emu, symbols['graph_plot'], (0x70, 0x16, LETTERS['X'], 0x25, 0x63))
         _until(emu, 0x80800, seconds=180)
@@ -556,7 +593,7 @@ def _ui_case(emu, out, symbols):
         _until(emu, symbols['graph_view_menu'], (DIGITS[3],))
         _until(emu, 0x80800)
         _until(emu, 0x80800, (0x57,))
-        _until(emu, symbols['graph_plot'], (DIGITS[1],))
+        _until(emu, symbols['graph_plot'], (DIGITS[2],))
         _, registers = _until(emu, 0x80800, seconds=180)
         frame, address, state = _descriptor(emu, registers)
         window = [str(scalar_decimal(state[at:at + 20]))
@@ -749,7 +786,10 @@ def _table_lifecycle_case(emu, out, symbols):
         _until(emu, symbols['graph_mode_select'], (0x07, DIGITS[7]))
         _until(emu, 0x80800)
         _until(emu, symbols['graph'], (DIGITS[1],))
-        _until(emu, symbols['graph_plot'])
+        _until(emu, 0x80800)
+        _until(emu, symbols['graph_menu'], (0x17,))
+        _until(emu, 0x80800, seconds=180)
+        _until(emu, symbols['graph_plot'], (0x26,))
         _until(emu, 0x80800, seconds=180)
         before, shared = trace('graph-table-shared-trace')
         record['steps'].append('Physical GRAPH rereads TABLE formula and traces X 2 to Y 5 after native sample cleanup')
@@ -779,10 +819,12 @@ def _table_lifecycle_case(emu, out, symbols):
         _until(emu, 0x80800)
         _until(emu, 0x1234e, (0x26,))
         assert emu.memory(0x8091, 1) == b'\x81', 'TABLE lifecycle did not restore COMP'
-        # End with the suspended-viewer probe so restored timers need no keyboard input.
         emu.call('load_snapshot', id=live)
         emu.invoke(symbols['graph'], {'sp': emu.registers()['sp']},
-                   stop_at=symbols['graph_plot'], keep=True, seconds=10)
+                   stop_at=symbols['fn_graph_help__key'], keep=True, seconds=10)
+        _until(emu, symbols['graph_menu'], (0x17,))
+        _until(emu, 0x80800, seconds=180)
+        _until(emu, symbols['graph_plot'], (0x26,))
         _until(emu, 0x80800, seconds=180)
         _, address, _ = _descriptor(emu, emu.registers())
         from firmware.e5800p.graph_math import _number
@@ -820,7 +862,8 @@ def graph_cases(emu, out):
     linked = fw.link()
     symbols = linked['symbols']
     required = ('graph_calc', 'graph_cancel', 'graph', 'graph_mode_select', 'graph_plot',
-                'graph_menu', 'graph_view_menu', 'graph_trace',
+                'graph_help', 'graph_menu', 'graph_view_menu', 'graph_trace',
+                'graph_sketch', 'graph_pen_help', 'graph_pen_menu', 'graph_pen_commit',
                 'graph_input_tokens', 'graph_number_input')
     for name in required:
         block = next(block for block in linked['blocks'] if block['name'] == name)

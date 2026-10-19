@@ -136,9 +136,11 @@ S4 是 CPU `9:0000–9:FFFF` 的 64 KiB，初始化后用于应用。原生 Buil
    ```
 
 4. 关闭型号副本，再[部署并启动](e5800p.md#加载与备份) `build/apps-hello.bin`。后续安装以副本最新保存的 Flash 为输入。
-5. 在配套模拟器的计算页面按 **F10 → 6:Add-in → HELLO**。HELLO 显示文字，EXIT 返回启动器，屏幕显示 `RETURN 42`，EXE 回列表。
+5. 按 **MODE → 9:APPS**，按 HELLO 前的数字选择，再按 EXE 运行。HELLO 显示文字，EXIT 返回启动器，屏幕显示 `RETURN 42`，EXE 或 EXIT 回列表。配套模拟器也保留 **F10 → 6:Add-in** 入口。
 
 第二个示例 [`examples/app_return.py`](../examples/app_return.py) 链接到 `9:1000`，返回 7。HELLO 位于 `9:0100`；两个示例可装入同一镜像。
+
+APPS 每页三个应用，左右键翻页，EXIT 返回。应用区未初始化或目录损坏时，启动器保留 S4 内容并提示使用 PC 工具链；初始化和安装由上述 CLI 命令显式执行。
 
 ### 生成实机烧写镜像
 
@@ -205,7 +207,7 @@ python tools/casio_tool.py app remove build/apps-replaced.bin HELLO -o build/app
 python tools/casio_tool.py app restore build/apps-removed.bin build/s4-original.bin -o build/library-restored.bin
 ```
 
-`restore` 用备份覆盖整个 S4，恢复原生库。每条命令生成独立输出；参数或格式错误时保留已有文件。`list` 的 `modified` 表示代码 CRC 与包记录有差异，可在设备上选择 `APP MODIFIED → 1:RUN` 运行。
+`restore` 用备份覆盖整个 S4，恢复原生库。每条命令生成独立输出；参数或格式错误时保留已有文件。`list` 的 `modified` 表示代码 CRC 与包记录有差异；设备上选择该应用后显示 `APP MODIFIED`，EXE 运行当前机器码，EXIT 返回。
 
 ### 应用入口
 
@@ -357,20 +359,21 @@ python tools/casio_tool.py debug --model "$Model" read 9:2000 16 -o build/live.b
 | 功能 | 模块 |
 | --- | --- |
 | e.basic 输入、执行、编译、内存和绘图 | `basic.py`、`basic_asm.py`、`memory.py`、`graphics.py` |
+| 矩阵、字符串和编号对象存储 | `matrix.py`、`strings.py`、`objects.py` |
 | GRAPH、原生公式与数值分析 | `graph_view.py`、`graph_gate.py`、`graph_input.py`、`graph_math.py`、`mcs.py` |
 | Add-in 目录、启动器与原生库切换 | `apps.py`、`app_hooks.py` |
 | 菜单、ASM/Hex 与指令目录 | `ui.py`、`editing.py`、`instructions.py` |
 | 批量改写、journal、关机签名与原生接入 | `batch.py`、`storage.py`、`logo.py`、`hooks.py` |
 | 固定入口、区间大小与原始指纹 | `layout.py` |
 
-原生代码使用 PL/e 的寄存器操作，常量表用 Python 数据声明。修改长度时同步调整布局、原始区间指纹和地址引用，然后重新构建：
+原生代码使用 PL/e 的寄存器操作，常量表用 Python 数据声明。公开入口和数据地址保持固定，私有函数在登记的可写区间内链接。修改后重新构建：
 
 ```powershell
 $Original = Read-Host '匹配的原厂 Flash 文件路径'
 python -m kits firmware/e5800p/project.py "$Original" -o build/e5800p.bin --map build/e5800p.map.json --listing build/e5800p.asm
 ```
 
-构建会执行项目模块中的 Python 代码。`build --project` 可指定其他项目；旧生成器和 `generate/--patchset` 流程见 [legacy](../legacy/README.md)。
+构建会执行项目模块中的 Python 代码。`build --project` 可指定其他项目。
 
 ### 原生挂钩与数据替换
 
@@ -395,27 +398,21 @@ python -m kits firmware/e5800p/project.py "$Original" -o build/e5800p.bin --map 
 
 固件在低 512 KiB 内分配代码。芯片容量和高半区访问条件见 [地址映射](flash_upper_mapping.md)。
 
-`layout.py` 定义固定区间，`tools/flash_layout.py` 提供工具和验证入口常量：
+`layout.py` 登记可写区间和输入指纹，`tools/flash_layout.py` 提供工具和验证入口常量：
 
 | 区域 | 当前用途 |
 | --- | --- |
 | S0 | `8:0200–2FFF` 放置已登记的固件函数；选择器 `8:0200`、CALL 桥 `8:0400`、扫描器 `8:0800` 保持固定入口。 |
-| journal | `8:3000–3FFF` 保存 Hex 提交与恢复数据。 |
-| F 尾部 | `F:3E68–FFDF` 按完整例程排列 e.basic、GRAPH、ASM/Hex、Add-in 及其数据；原生 FUNCTION 表保留至 `F:3E67`。 |
+| journal 代码区 | `8:3000–3FFF` 放置 Hex 提交、恢复例程及其他固件函数；恢复数据保存在 S1/S2。 |
+| F 尾部 | `F:3E68–FFDF` 排列 e.basic、矩阵、字符串、GRAPH、ASM/Hex、Add-in 及其数据；原生 FUNCTION 表保留至 `F:3E67`。 |
 | S4 | `9:0000–FFFF` 由原生程序库或显式初始化后的 Add-in 使用；应用从 `9:0100` 起装载，目录位于银行尾部。 |
 | 原生 footer | `F:FFE0–FFFD` 保存启动签名、型号与版本；`F:FFFE` 为校验 word。 |
 
-map 的 `regions` 按 CPU 地址排序，每项含 `name,cpu_start,physical_start,size,reserved_stop,kind`；kind 为 code/data，另记录原生校验字段。公开入口地址固定，私有函数地址和大小见 `layout.py` 及构建 map。
+map 的 `regions` 按 CPU 地址排序，每项含 `name,cpu_start,physical_start,size,reserved_stop,kind`；kind 为 code/data，另记录原生校验字段。公开入口地址固定，私有函数的实际地址和大小见构建 map。
 
 原生校验是物理 `[0x40000,0x7FFFE)` 的无符号字节和模 65536，结果按小端写入 `0x7FFFE`。原生 Flash 诊断在 SUM 通过后会擦除 S0 及其中的扩展；保留扩展的验证流程在擦除调用前返回。
 
 ## 测试
-
-在已安装工具链的项目根目录运行单元测试：
-
-```powershell
-python -m unittest discover -s tests -v
-```
 
 模拟器测试需要[配套模拟器](emulator.md)、已[加载固件](e5800p.md#加载与备份)的完整型号副本，以及匹配的原厂 512 KiB Flash。先执行 OFF 保存并备份整个型号，再启动副本，独占 MCP 端口 3001。测试会复位并改写程序、变量及 Flash S1～S6；失败时用备份恢复。
 

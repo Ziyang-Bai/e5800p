@@ -488,8 +488,7 @@ def install(fw):
         cpu.label('near_26')
         cpu.er0 = cpu.mem16[0x00, cpu.offset(cpu.er14, 0x0012)]
         cpu.er2 = cpu.mem16[0x00, cpu.offset(cpu.er14, 0x0016)]
-        cpu.r4 = 0x58
-        cpu.r5 = 0x9D
+        cpu.er4 = cpu.address('fn_basic_asm__reader') & 0xFFFF
         cpu.er6 = cpu.er14
         cpu.r8 = cpu.mem8[0x00, cpu.offset(cpu.er14, 0x007C)]
         cpu.call(BASIC_FLASH)
